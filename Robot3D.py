@@ -18,6 +18,7 @@ links = np.array([0,.3,.3])
 workspace = np.sum(links)
 max_obj_vel = workspace/3 # takes 3 seconds to move across the entire workspace
 workspace_limits = np.array([[-workspace, workspace],[-workspace, workspace],[0, .9]])
+res = 0.01
 # dt = .01
 
 
@@ -65,6 +66,12 @@ def T_1F(ph, S):
                      [s(ph),  c(ph), 0, 0],
                      [    0,      0, 1, S], 
                      [    0,      0, 0, 1]])
+
+def quantize(arr, res=res, workspace_limits=workspace_limits):
+    range_ = np.abs(workspace_limits[:,1] - workspace_limits[:,0])
+    ndx_range = range_/res 
+    ndx = ndx_range * (arr - workspace_limits[:,0]) / range_
+    return ndx   
 
     
 # In[4]:
@@ -295,7 +302,7 @@ class rand_object():
         self.vel = (.5*np.random.rand()+.5)*max_obj_vel*v_vec
         self.tf = np.sqrt((self.goal[0]-self.start[0])**2 + (self.goal[1]-self.start[1])**2) / np.linalg.norm(self.vel)
         self.curr_pos = self.start
-        
+
     def set_pos(self, pos):
         self.curr_pos = pos
         
@@ -317,9 +324,65 @@ class rand_object():
     def step(self, time_step):
         self.curr_pos = self.curr_pos + self.vel*time_step
     
-    # def contact_point(self, object_pos):
-    #     return -1*approach_vec*self.radius
-    
+    def get_coord_list(self, res = .01, make_plot=False):
+        check = [[0,res,-res],[0,res,0],[0,res,res],[0,0,res],[0,-res,res],[0,-res,0],[0,-res,-res],[0,0,-res],[0,res,-res]]
+        r_int = int(np.round(self.radius/res))
+        r = self.radius
+        pos = self.curr_pos
+        x_c,y_c = pos[0],pos[1]
+        pos = pos - np.array([r,0,0])
+        coord_list = []
+        feat_list = []
+        coord_list.append(pos)
+        feat_list.append(1.0)
+        pos = pos + np.array([res,0,0])
+        x = pos[0]
+        for i in range(-r_int+1,r_int):
+            y_start = np.sqrt(abs(r**2 - (x-x_c)**2)) + y_c
+            start = np.array([pos[0],y_start,pos[2]])
+            pos = start
+            done = False
+            n = 0
+            while not done:
+                n += 1
+                found_next = False
+                for j in range(1,len(check)):
+                    check_loc = pos + check[j] - self.curr_pos
+                    prev_loc = pos + check[j-1] - self.curr_pos
+                    if np.round(np.linalg.norm(check_loc),2) == np.round(r,2) and np.round(np.linalg.norm(prev_loc),2) > np.round(r,2):
+                        coord_list.append(pos+check[j])
+                        feat_list.append(1.0)
+                        pos = pos + check[j]
+                        j = len(check) + 1
+                        found_next = True
+                
+                if np.all(np.round(start,2) == np.round(pos,2)) and found_next:
+                    done = True
+                elif not found_next:
+                    done = True
+                elif n > 1000:
+                    done = True
+            
+            pos = np.array([pos[0]+res, self.curr_pos[1], self.curr_pos[2]])
+            x = pos[0]
+        
+        coord_list.append(self.curr_pos+np.array([r,0,0])) 
+        feat_list.append(1.0) 
+
+        if make_plot:
+            coord_list = np.array(coord_list)
+            xx = coord_list[:,0]
+            yy = coord_list[:,1]
+            zz = coord_list[:,2]
+            fig = plt.figure()
+            ax = plt.axes(projection='3d')
+            ax.plot3D(xx,yy,zz)
+            ax.axes.set_xlim3d(left=self.curr_pos[0] - 1.5*r, right=self.curr_pos[0] + 1.5*r) 
+            ax.axes.set_ylim3d(bottom=self.curr_pos[1] - 1.5*r, top=self.curr_pos[1] + 1.5*r) 
+            ax.axes.set_zlim3d(bottom=self.curr_pos[2] - 1.5*r, top=self.curr_pos[2] + 1.5*r)
+            plt.show()
+
+        return coord_list, feat_list
 
 class defined_object():
     def __init__(self, start, goal, vel, object_radius=.03):
