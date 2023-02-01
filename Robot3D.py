@@ -283,7 +283,7 @@ class robot_3link():
         ax.axes.set_xlim3d(left=-workspace, right=workspace) 
         ax.axes.set_ylim3d(bottom=-workspace, top=workspace) 
         ax.axes.set_zlim3d(bottom=0, top=workspace+self.S[0]) 
-        plt.show()
+        # plt.show()
 
 
 # In[5]:
@@ -330,18 +330,30 @@ class rand_object():
             
         return np.array([x,y])
 
-    def step(self, time_step=None):
-        if time_step == None:
-            self.t = self.t + 1
-            time_step = self.t 
-        else:
-            self.t = time_step
+    # def step(self, time_step=None):
+    #     if time_step == None:
+    #         self.t = self.t + 1
+    #         time_step = self.t 
+    #     else:
+    #         self.t = time_step
 
-        if time_step*self.dt < self.tf:
-            self.curr_pos = self.curr_pos + self.vel*self.dt
-        else:
-            self.curr_pos = self.goal
-    
+    #     if time_step*self.dt < self.tf:
+    #         self.curr_pos = self.curr_pos + self.vel*self.dt
+    #     else:
+    #         self.curr_pos = self.goal
+    # def get_coord_list(self, res=res, make_plot=False):
+    #     def check_range(point, limits):
+    #         if np.all(point >= limits[:,0]) and np.all(point<=limits[:,1]):
+    #             return True 
+    #         else:
+    #             return False
+
+    #     def y_solve(x,y,z,r):
+
+
+
+
+
     def get_coord_list(self, res = res, make_plot=False):
         # this function creates a coordinate list of points along
         # the object's surface based on a spherical representation, the radius
