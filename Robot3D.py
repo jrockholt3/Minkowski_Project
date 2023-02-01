@@ -284,14 +284,13 @@ class robot_3link():
         ax.axes.set_ylim3d(bottom=-workspace, top=workspace) 
         ax.axes.set_zlim3d(bottom=0, top=workspace+self.S[0]) 
         plt.show()
-        
 
 
 # In[5]:
 
 
 class rand_object():
-    def __init__(self,object_radius=.03):
+    def __init__(self,object_radius=.03,dt=.01667):
         self.radius = object_radius
         # init the object's location at a random (x,y) within the workspace
         rho = np.random.rand(2)*workspace/2 + workspace/4           
@@ -304,8 +303,14 @@ class rand_object():
         self.goal = np.array([rho[0]*m.cos(phi+phi2), rho[0]*m.sin(phi+phi2), np.random.rand()*z_range - z_min])
         v_vec = (self.goal - self.start) / np.linalg.norm((self.goal - self.start))
         self.vel = (.5*np.random.rand()+.5)*max_obj_vel*v_vec
-        self.tf = np.sqrt((self.goal[0]-self.start[0])**2 + (self.goal[1]-self.start[1])**2) / np.linalg.norm(self.vel)
+        self.tf = np.linalg.norm(self.goal - self.start) / np.linalg.norm(self.vel)
         self.curr_pos = self.start
+        self.t = 0 # an interger defining the time step 
+        self.dt = dt # time between time steps
+        if not np.all(np.abs(self.start)-self.radius <= workspace_limits[:,1]):
+            print('starting point out of workspace')
+        if not np.all(np.abs(self.start)-self.radius <= workspace_limits[:,1]):
+            print('end point is out of workspace')
 
     def set_pos(self, pos):
         self.curr_pos = pos
@@ -325,12 +330,21 @@ class rand_object():
             
         return np.array([x,y])
 
-    def step(self, time_step):
-        self.curr_pos = self.curr_pos + self.vel*time_step
+    def step(self, time_step=None):
+        if time_step == None:
+            self.t = self.t + 1
+            time_step = self.t 
+        else:
+            self.t = time_step
+
+        if time_step*self.dt < self.tf:
+            self.curr_pos = self.curr_pos + self.vel*self.dt
+        else:
+            self.curr_pos = self.goal
     
     def get_coord_list(self, res = res, make_plot=False):
         # this function creates a coordinate list of points along
-        # the object's surface based on a spherical representation and the radius
+        # the object's surface based on a spherical representation, the radius
         # and the resolution of the workspace
         # the function starts at one end of the sphere then iterates over the x-axis
         # at each "slice" along the x-axis, it finds points on the surfaces
@@ -350,8 +364,7 @@ class rand_object():
             x_c,y_c = pos[0],pos[1]
             pos = pos - np.array([r,0,0])
             if check_range(pos, workspace_limits): 
-                # coord_list.append(quantize(pos).reshape(1,len(pos)))
-                coord_list.append(quantize(pos))
+                coord_list.append(np.hstack([self.t,quantize(pos)]))
                 feat_list.append(np.array([1]))
             pos = pos + np.array([res,0,0])
             x = pos[0]
@@ -371,7 +384,7 @@ class rand_object():
                             pos = pos + check[j]
                             if check_range(pos, workspace_limits):
                                 # coord_list.append(quantize(pos).reshape(1,len(pos)))
-                                coord_list.append(quantize(pos))
+                                coord_list.append(np.hstack([self.t,quantize(pos)]))
                                 feat_list.append(np.array([1]))
                             j = len(check) + 1
                             found_next = True
@@ -382,6 +395,7 @@ class rand_object():
                         done = True
                     elif n > 1000:
                         done = True
+                        print('get_coord_list broke on over flow')
                 
 
                 pos = np.array([pos[0]+res, self.curr_pos[1], self.curr_pos[2]])
@@ -390,7 +404,7 @@ class rand_object():
             arr = self.curr_pos+np.array([r,0,0])
             if check_range(arr,workspace_limits):
                 # coord_list.append(quantize(pos).reshape(1,len(pos)))
-                coord_list.append(quantize(pos))
+                coord_list.append(np.hstack([self.t,quantize(arr)]))
                 feat_list.append(np.array([1]))
 
             if make_plot:
@@ -406,6 +420,9 @@ class rand_object():
                 # ax.axes.set_ylim3d(bottom=self.curr_pos[1] - 1.5*r, top=self.curr_pos[1] + 1.5*r) 
                 # ax.axes.set_zlim3d(bottom=self.curr_pos[2] - 1.5*r, top=self.curr_pos[2] + 1.5*r)
                 plt.show()
+        else:
+            print('object out of workspace', self.curr_pos)
+
 
         # return np.array(coord_list), np.array(feat_list)
         return np.array(coord_list), np.array(feat_list)
@@ -424,7 +441,7 @@ class defined_object():
     def set_pos(self, pos):
         self.curr_pos = pos
         
-    def path(self, t,set_new_pos=False):
+    def path(self, t, set_new_pos=False):
         goal = self.goal
         start = self.start
         tf = self.tf
