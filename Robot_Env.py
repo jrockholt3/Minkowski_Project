@@ -111,8 +111,8 @@ class RobotEnv():
         g = np.random.choice(4)
         while s == g:
             g = np.random.choice(4)
-        self.start = XX[s,:]
-        self.goal = XX[g,:]
+        self.start = np.array([0,np.pi/4,-np.pi/2])
+        self.goal = np.array([-np.pi/3, np.pi/12, -np.pi/3])
         self.robot.set_pose(self.start)
         self.shape = 10
         self.action_space = action_space()
@@ -132,14 +132,8 @@ class RobotEnv():
 
     # need to return the relative positions of the object and the relative vels
     # in terms of the end effector frame of reference.
-    def step(self, action):
-        if not isinstance(action, np.ndarray): 
-            action = action.numpy()
-        # change in action to be used as a penalty
-        dadt = np.linalg.norm((action - self.prev_tau)/dt) # chnage in action
-        self.prev_tau = action
-
-        tau = action
+    def step(self):
+        tau, dedt = self.Controller.step(self.jnt_err)
         nxt_vel = (tau-damping*self.robot.jnt_vel)*dt + self.robot.jnt_vel
         self.robot.set_jnt_vel(nxt_vel) 
         nxt_pos = angle_calc(dt * self.robot.jnt_vel + self.robot.pos)
@@ -165,9 +159,8 @@ class RobotEnv():
 
         # state = np.hstack((self.jnt_err, self.jnt_err_vel)) #, rel_pos, rel_vel))
         state = jnt_err
-        return state, reward, done, done, self.info
-
-
+        # return state, reward, done, done, self.info
+        return self.t_sum, self.robot.pos, done
 
 
     def reset(self):
