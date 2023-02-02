@@ -286,8 +286,6 @@ class robot_3link():
         # plt.show()
 
 
-# In[5]:
-
 
 class rand_object():
     def __init__(self,object_radius=.03,dt=.01667):
@@ -330,31 +328,93 @@ class rand_object():
             
         return np.array([x,y])
 
-    # def step(self, time_step=None):
-    #     if time_step == None:
-    #         self.t = self.t + 1
-    #         time_step = self.t 
-    #     else:
-    #         self.t = time_step
+    def step(self, time_step=None):
+        if time_step == None:
+            self.t = self.t + 1
+            time_step = self.t 
+        else:
+            self.t = time_step
 
-    #     if time_step*self.dt < self.tf:
-    #         self.curr_pos = self.curr_pos + self.vel*self.dt
-    #     else:
-    #         self.curr_pos = self.goal
-    # def get_coord_list(self, res=res, make_plot=False):
-    #     def check_range(point, limits):
-    #         if np.all(point >= limits[:,0]) and np.all(point<=limits[:,1]):
-    #             return True 
-    #         else:
-    #             return False
+        if time_step*self.dt < self.tf:
+            self.curr_pos = self.curr_pos + self.vel*self.dt
+        else:
+            self.curr_pos = self.goal
 
-    #     def y_solve(x,y,z,r):
+    def get_coord_list(self, res=res, make_plot=False):
+        def check_range(point, limits=workspace_limits):
+            if np.all(point >= limits[:,0]) and np.all(point<=limits[:,1]):
+                return True 
+            else:
+                return False
+
+        def y_solve(x,z,r,pos):
+            x_c,y_c,z_c = pos[0],pos[1],pos[2]
+            return np.sqrt(np.abs(r**2 - (z-z_c)**2 - (x-x_c)**2))
+
+        def r_solve(z,r,z_c):
+            return np.sqrt(np.abs(r**2 - (z-z_c)**2))
+
+        if np.all(np.abs(self.curr_pos)-self.radius <= workspace_limits[:,1]):
+            coord_list = []
+            feat_list = []
+            z = self.curr_pos[2] - self.radius
+            while z <= self.curr_pos[2] + self.radius:
+                # perp distance from x-axis to sphere surface 
+                r_slice = r_solve(z,self.radius,self.curr_pos[2])
+                if np.round(r_slice,2) > 0:
+                    x = self.curr_pos[0] - r_slice
+                    while x <= self.curr_pos[0] + r_slice:
+                        y = self.curr_pos[1] + y_solve(x,z,self.radius,self.curr_pos)
+                        point = np.round(np.array([x,y,z]),2)
+                        if check_range(point):
+                            coord_list.append(np.hstack([self.t,quantize(point)]))
+                            feat_list.append(1)
+                        x = x + res
+                    x = self.curr_pos[0] + r_slice # reset x
+                    while x >= self.curr_pos[0] - r_slice:
+                        y = self.curr_pos[1] - y_solve(x,z,self.radius,self.curr_pos)
+                        point = np.round(np.array([x,y,z]),2)
+                        if check_range(point):
+                            coord_list.append(np.hstack([self.t,quantize(point)]))
+                            feat_list.append(1)
+                        x = x - res
+                    z = z + res
+                else:
+                    x_c,y_c = self.curr_pos[0], self.curr_pos[1]
+                    point = np.array([x_c,y_c,z])
+                    if check_range(point):
+                            coord_list.append(np.hstack([self.t,quantize(point)]))
+                            feat_list.append(1)
+                    z = z + res
+        else:
+            print('object out of range')
+            return
+
+        if make_plot:
+            coord_list2 = np.array(coord_list)
+            xx = coord_list2[:,0]
+            yy = coord_list2[:,1]
+            zz = coord_list2[:,2]
+            fig = plt.figure()
+            ax = plt.axes(projection='3d')
+            ax.plot3D(xx,yy,zz)
+            ax.scatter3D(xx,yy,zz,alpha=.5)
+            ax.set_xlabel('x-axis')
+            ax.set_ylabel('y-axis')
+            ax.set_zlabel('z-axis')
+            # ax.axes.set_xlim3d(left=self.curr_pos[0] - 1.5*r, right=self.curr_pos[0] + 1.5*r) 
+            # ax.axes.set_ylim3d(bottom=self.curr_pos[1] - 1.5*r, top=self.curr_pos[1] + 1.5*r) 
+            # ax.axes.set_zlim3d(bottom=self.curr_pos[2] - 1.5*r, top=self.curr_pos[2] + 1.5*r)
+            plt.show()
+        
+        return np.vstack(coord_list), np.vstack(feat_list)
 
 
 
 
 
-    def get_coord_list(self, res = res, make_plot=False):
+
+    def get_coord_list2(self, res = res, make_plot=False):
         # this function creates a coordinate list of points along
         # the object's surface based on a spherical representation, the radius
         # and the resolution of the workspace
@@ -421,9 +481,9 @@ class rand_object():
 
             if make_plot:
                 coord_list2 = np.array(coord_list)
-                xx = coord_list2[:,0]
-                yy = coord_list2[:,1]
-                zz = coord_list2[:,2]
+                xx = coord_list2[:,1]
+                yy = coord_list2[:,2]
+                zz = coord_list2[:,3]
                 fig = plt.figure()
                 ax = plt.axes(projection='3d')
                 ax.plot3D(xx,yy,zz)
@@ -436,8 +496,8 @@ class rand_object():
             print('object out of workspace', self.curr_pos)
 
 
-        # return np.array(coord_list), np.array(feat_list)
         return np.array(coord_list), np.array(feat_list)
+
 
 class defined_object():
     def __init__(self, start, goal, vel, object_radius=.03):
@@ -473,96 +533,4 @@ class defined_object():
     def contact_point(self, object_pos):
         return -1*approach_vec*self.radius
         
-
-# In[7]:
-
-
-# robot = robot_3link()
-# robot.forward(th=np.array([0,m.pi/2,0]), make_plot=True)
-# plt.show()
-
-
-# In[8]:
-
-
-# obj = defined_object(np.array([0,.5]), np.array([.5,.5]), .3)
-
-
-# In[9]:
-
-
-# obj.vel
-
-
-# In[10]:
-
-
-# th_arr = np.array([0,m.pi,0])
-# robot.forward(th=th_arr, make_plot=True)
-# rel_v_arr = robot.relative_velocity(obj, w=np.array([0,0,0]), th=th_arr)
-# np.round(rel_v_arr,4)
-
-
-# In[11]:
-
-
-# rel_v_arr[:,0]
-
-
-# In[ ]:
-
-
-
-
-
-# In[12]:
-
-
-# T_dict = robot.get_transform(th=th_arr)
-# T_Fto1 = T_inverse(T_dict['2toF'])
-# v1 = rel_v_arr[:,1]
-# v1 = np.hstack((v1, 0))
-# print(v1)
-# np.round(T_Fto1@v1,3)
-
-
-# In[13]:
-
-
-# prox = robot.proximity(obj)
-# prox
-
-
-# In[14]:
-
-
-# th_arr_goal = robot.reverse(np.array([.6,.2]), m.pi/1.5, make_plot=True)
-# np.round(th_arr_goal,3)
-
-
-# In[15]:
-
-
-# arr = np.round(robot.forward(th_arr_start[:,0]),3)
-# arr[0:4,0], arr
-
-
-# In[16]:
-
-
-# traj = simple_trajectory(th_arr_start[:,1], th_arr_goal[:,0],robot)
-
-
-# In[17]:
-
-
-# plot_traj(traj, robot);
-
-
-# In[18]:
-
-
-# x_axis = np.array([1,0,0])
-# pos = np.array([.5,-1,0])
-# np.linalg.norm(np.cross(x_axis, pos)), np.dot(x_axis,pos)
 
