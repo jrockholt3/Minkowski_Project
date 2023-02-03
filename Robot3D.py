@@ -73,7 +73,7 @@ def T_1F(ph, S):
 # In[4]:
 
 class robot_3link():
-    def __init__(self):
+    def __init__(self, label=np.array([1,0,0])):
         self.base = np.array([0,0,0,1])
         self.links = np.array([0,.3,.3])
         self.aph = np.array([np.pi/2, 0.0, 0.0]) # twist angles
@@ -83,6 +83,7 @@ class robot_3link():
         self.v_lim = np.array([m.pi, m.pi, m.pi]) # joint velocity limits 
         self.jnt_vel = np.array([0.0, 0.0, 0.0])
         self.traj = np.array([])
+        self.label = label
 #        self.th_lim = np.array()
 
     def set_pose(self, th_arr):

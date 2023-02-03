@@ -7,9 +7,13 @@ from helpers import quantize
 
 class rand_object():
     def __init__(self,object_radius=.03,dt=.01, res=0.01, max_obj_vel = 1.2, \
-                workspace_limits=np.array([[-.6,.6],[-.6,.6],[0,.9]])):
+                label=np.array([0,1,0]),workspace_limits=np.array([[-.6,.6],[-.6,.6],[0,.9]])):
         self.radius = object_radius
         self.res = res
+        self.t = 0 # an interger defining the time step 
+        self.dt = dt # time between time steps
+        self.label = label # classification of the type of object
+
         # init the object's location at a random (x,y) within the workspace
         self.workspace_limits = workspace_limits
         rho = np.random.rand() * self.workspace_limits[0,1]        
@@ -23,8 +27,6 @@ class rand_object():
         self.vel = (.5*np.random.rand()+.5)*max_obj_vel*v_vec
         self.tf = np.linalg.norm(self.goal - self.start) / np.linalg.norm(self.vel)
         self.curr_pos = self.start
-        self.t = 0 # an interger defining the time step 
-        self.dt = dt # time between time steps
         if not np.all(np.abs(self.start)-self.radius <= workspace_limits[:,1]):
             print('starting point out of workspace')
         if not np.all(np.abs(self.start)-self.radius <= workspace_limits[:,1]):
@@ -91,10 +93,10 @@ class rand_object():
                         if check_range(point):
                             if return_data:
                                 coord_list.append(np.hstack([self.t,point]))
-                                feat_list.append(-1)
+                                feat_list.append(self.label)
                             else:
                                 coord_list.append(np.hstack([self.t,quantize(point)]))
-                                feat_list.append(-1)
+                                feat_list.append(self.label)
                         x = x + self.res
                     x = self.curr_pos[0] + r_slice # reset x
                     while x >= self.curr_pos[0] - r_slice:
@@ -103,10 +105,10 @@ class rand_object():
                         if check_range(point):
                             if return_data:
                                 coord_list.append(np.hstack([self.t,point]))
-                                feat_list.append(-1)
+                                feat_list.append(self.label)
                             else:
                                 coord_list.append(np.hstack([self.t,quantize(point)]))
-                                feat_list.append(-1)
+                                feat_list.append(self.label)
                         x = x - self.res
                     z = z + self.res
                 else:
@@ -115,10 +117,10 @@ class rand_object():
                     if check_range(point):
                         if return_data:
                             coord_list.append(np.hstack([self.t,point]))
-                            feat_list.append(1)
+                            feat_list.append(self.label)
                         else:
                             coord_list.append(np.hstack([self.t,quantize(point)]))
-                            feat_list.append(1)
+                            feat_list.append(self.label)
                     z = z + self.res
         else:
             print('object out of range', self.curr_pos)
@@ -155,12 +157,13 @@ class rand_object():
 
 
 class Cylinder():
-    def __init__(self, r=.05, L=.3, res=.01/1.5):
+    def __init__(self, r=.05, L=.3, res=.01/1.5, label=np.array([1,0,0])):
         self.r = r 
         self.L = L
         self.res = res
         self.original = self.make_cloud()
-        self.cloud = self.make_cloud()
+        self.cloud = self.original.copy()
+        self.label = label
 
     def make_cloud(self):
         def circle_solve(x,r):
@@ -217,16 +220,44 @@ class Cylinder():
         feat_list = []
         for i in range(arr.shape[1]):
             coord_list.append(np.hstack([t,quantize(arr[:,i],res=self.res)]))
-            feat_list.append(1)
+            feat_list.append(self.label)
         return np.vstack(coord_list), np.vstack(feat_list)
 
 
-# cylinder = Cylinder()
-# obj = rand_object()
-# # print(obj.get_coord_list())
-# out1, feat1 = cylinder.get_coord_list(0)
-# out2, feat2 = obj.get_coord_list()
 
-# print(out1.shape, out2.shape)
-# out = np.vstack([out1,out2])
-# print(out.shape)
+'''
+Currently defined object is not used and is decrepit
+'''
+class defined_object():
+    def __init__(self, start, goal, vel, object_radius=.03):
+        self.radius = object_radius
+        # init the object's location at a random (x,y) within the workspace
+        self.start = start
+        self.goal = goal
+        v_vec = (self.goal - self.start) / np.linalg.norm((self.goal - self.start))
+        self.vel = vel*v_vec
+        self.tf = np.sqrt((self.goal[0]-self.start[0])**2 + (self.goal[1]-self.start[1])**2) / np.linalg.norm(self.vel)
+        self.curr_pos = self.start
+        
+    def set_pos(self, pos):
+        self.curr_pos = pos
+        
+    def path(self, t, set_new_pos=False):
+        goal = self.goal
+        start = self.start
+        tf = self.tf
+        
+        if t < tf:
+            x = t*(goal[0]-start[0])/tf + start[0]
+            y = t*(goal[1]-start[1])/tf + start[1]
+        else:
+            x = goal[0]
+            y = goal[1]
+            
+        if set_new_pos == True:
+            self.set_pos(np.array([x,y]))
+            
+        return np.array([x,y])
+    
+    def contact_point(self, object_pos):
+        return -1*approach_vec*self.radius
