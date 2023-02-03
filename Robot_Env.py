@@ -1,6 +1,7 @@
 import numpy as np
 import Robot3D as Robot
 from math import atan2
+from Robot3D import rand_object
 
 # global variables
 dt = 0.02 # time step
@@ -15,10 +16,10 @@ prox_thres = .05 # proximity threshold - 5 cm
 goal = np.array([np.pi/2, np.pi/2, np.pi/2])
 
 # Controller gains
-tau_max = 10 #J*rad/s^2, J = 1
+tau_max =  30 #J*rad/s^2, J = 1
 damping = tau_max*.5
 P = 10
-D = 5
+D = 50
 
 def a(list):
     return np.array(list)
@@ -128,6 +129,8 @@ class RobotEnv():
         self.Controller = PDControl()
         self.prev_tau = np.array([0,0,0])
 
+        self.obj = rand_object()
+
 
 
     # need to return the relative positions of the object and the relative vels
@@ -160,7 +163,7 @@ class RobotEnv():
         # state = np.hstack((self.jnt_err, self.jnt_err_vel)) #, rel_pos, rel_vel))
         state = jnt_err
         # return state, reward, done, done, self.info
-        return self.t_sum, self.robot.pos, done
+        return self.t_sum, self.robot.pos, done, 
 
 
     def reset(self):

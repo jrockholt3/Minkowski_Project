@@ -16,7 +16,7 @@ from mpl_toolkits import mplot3d
 # settings
 links = np.array([0,.3,.3])
 workspace = np.sum(links)
-max_obj_vel = workspace/3 # takes 3 seconds to move across the entire workspace
+max_obj_vel = workspace # takes 3 seconds to move across the entire workspace
 workspace_limits = np.array([[-workspace, workspace],[-workspace, workspace],[0, .9]])
 res = 0.01
 # dt = .01
@@ -290,8 +290,8 @@ class rand_object():
         rho = np.random.rand(2)*workspace/2 + workspace/4           
             # print(C_list)
         phi = 2*m.pi*np.random.rand()
-        phi2 = (m.pi/2)*np.random.rand() - m.pi/4
-        z_range = np.sum(np.abs(workspace_limits[2,:]))
+        phi2 = (m.pi)*np.random.rand() - m.pi/2
+        z_range = np.sum(np.abs(workspace_limits[2,:])) * .7
         z_min = np.abs(workspace_limits[2,0])
         self.start = np.array([rho[0]*m.cos(phi), rho[0]*m.sin(phi), np.random.rand()*z_range - z_min])
         self.goal = np.array([rho[0]*m.cos(phi+phi2), rho[0]*m.sin(phi+phi2), np.random.rand()*z_range - z_min])
@@ -336,7 +336,8 @@ class rand_object():
         else:
             self.curr_pos = self.goal
 
-    def get_coord_list(self, res=res, make_plot=False):
+    def get_coord_list(self, res=res, make_plot=False, return_data=False):
+
         def check_range(point, limits=workspace_limits):
             if np.all(point >= limits[:,0]) and np.all(point<=limits[:,1]):
                 return True 
@@ -363,22 +364,34 @@ class rand_object():
                         y = self.curr_pos[1] + y_solve(x,z,self.radius,self.curr_pos)
                         point = np.round(np.array([x,y,z]),2)
                         if check_range(point):
-                            coord_list.append(np.hstack([self.t,quantize(point)]))
-                            feat_list.append(1)
+                            if return_data:
+                                coord_list.append(np.hstack([self.t,point]))
+                                feat_list.append(1)
+                            else:
+                                coord_list.append(np.hstack([self.t,quantize(point)]))
+                                feat_list.append(1)
                         x = x + res
                     x = self.curr_pos[0] + r_slice # reset x
                     while x >= self.curr_pos[0] - r_slice:
                         y = self.curr_pos[1] - y_solve(x,z,self.radius,self.curr_pos)
                         point = np.round(np.array([x,y,z]),2)
                         if check_range(point):
-                            coord_list.append(np.hstack([self.t,quantize(point)]))
-                            feat_list.append(1)
+                            if return_data:
+                                coord_list.append(np.hstack([self.t,point]))
+                                feat_list.append(1)
+                            else:
+                                coord_list.append(np.hstack([self.t,quantize(point)]))
+                                feat_list.append(1)
                         x = x - res
                     z = z + res
                 else:
                     x_c,y_c = self.curr_pos[0], self.curr_pos[1]
                     point = np.array([x_c,y_c,z])
                     if check_range(point):
+                        if return_data:
+                            coord_list.append(np.hstack([self.t,point]))
+                            feat_list.append(1)
+                        else:
                             coord_list.append(np.hstack([self.t,quantize(point)]))
                             feat_list.append(1)
                     z = z + res
@@ -405,7 +418,15 @@ class rand_object():
         
         return np.vstack(coord_list), np.vstack(feat_list)
 
+    def render(self):
+        u = np.linspace(0,2*np.pi,20)
+        v = np.linspace(0,np.pi,20)
 
+        x = self.radius * np.outer(np.cos(u),np.sin(v)) + self.curr_pos[0]
+        y = self.radius * np.outer(np.sin(u),np.sin(v)) + self.curr_pos[1]
+        z = self.radius * np.outer(np.ones(np.size(u)), np.cos(v)) + self.curr_pos[2]
+
+        return x,y,z
 
 class defined_object():
     def __init__(self, start, goal, vel, object_radius=.03):

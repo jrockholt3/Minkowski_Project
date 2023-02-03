@@ -2,7 +2,7 @@
 import numpy as np
 from Robot3D import robot_3link as Robot
 from Robot3D import rand_object as Object
-from Robot3D import workspace_limits
+from Robot3D import workspace_limits as lims
 from Robot3D import workspace
 from mpl_toolkits import mplot3d
 import matplotlib.pyplot as plt
@@ -27,14 +27,22 @@ for i in range(n):
     t += time() - t1
 print('method 1 t =', 1/(t/n))
 print(feat_list.shape)
-obj.curr_pos = obj.start
-for i in range(n):
-    t1 = time()
-    coord_list,feat_list = obj.get_coord_list2()
-    obj.step
-    t += time() - t1
-print('method 2 t =', 1/(t/n))
-print(feat_list.shape)
+
+xx,yy,zz = obj.render()
+print(xx.shape, yy.shape, zz.shape)
+fig = plt.figure()
+ax = fig.add_subplot(111,projection='3d')
+ax.plot_surface(xx,yy,zz)
+
+ax.set_xlim3d(lims[0,:])
+ax.set_xlabel('X')
+
+ax.set_ylim3d(lims[1,:])
+ax.set_ylabel('Y')
+
+ax.set_zlim3d(lims[2,:])
+ax.set_zlabel('Z')
+plt.show()
 
 # i = 0
 # while i < 200:
