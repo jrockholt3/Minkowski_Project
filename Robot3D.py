@@ -7,6 +7,7 @@ import numpy as np
 import math as m
 import matplotlib.pyplot as plt
 from mpl_toolkits import mplot3d
+from helpers import quantize
 
 # Goal is to create a joint space that the robot can operate in. As long as a decision doesn't put it out of this joint space it can go there. This could be constrain by the orientation of the part.   
 
@@ -67,20 +68,12 @@ def T_1F(ph, S):
                      [    0,      0, 1, S], 
                      [    0,      0, 0, 1]])
 
-def quantize(arr, res=res, workspace_limits=workspace_limits):
-    # this helper function takes in a 3xN array of (x,y,z) coords and
-    # outputs the ndx of the coord based on a array representing the whole workspace
-    # with resolution: "res"
-    range_ = np.abs(workspace_limits[:,1] - workspace_limits[:,0])
-    ndx_range = range_/res 
-    ndx = np.round(ndx_range * (arr - workspace_limits[:,0]) / range_)
-    return np.int16(ndx)   
 
     
 # In[4]:
 
 class robot_3link():
-    def __init__(self):
+    def __init__(self, label=np.array([1,0,0])):
         self.base = np.array([0,0,0,1])
         self.links = np.array([0,.3,.3])
         self.aph = np.array([np.pi/2, 0.0, 0.0]) # twist angles
@@ -90,6 +83,7 @@ class robot_3link():
         self.v_lim = np.array([m.pi, m.pi, m.pi]) # joint velocity limits 
         self.jnt_vel = np.array([0.0, 0.0, 0.0])
         self.traj = np.array([])
+        self.label = label
 #        self.th_lim = np.array()
 
     def set_pose(self, th_arr):
@@ -282,151 +276,6 @@ class robot_3link():
         ax.axes.set_ylim3d(bottom=-workspace, top=workspace) 
         ax.axes.set_zlim3d(bottom=0, top=workspace+self.S[0]) 
         plt.show()
-
-class rand_object():
-    def __init__(self,object_radius=.03,dt=.01667):
-        self.radius = object_radius
-        # init the object's location at a random (x,y) within the workspace
-        rho = np.random.rand(2)*workspace/2 + workspace/4           
-            # print(C_list)
-        phi = 2*m.pi*np.random.rand()
-        phi2 = (m.pi)*np.random.rand() - m.pi/2
-        z_range = np.sum(np.abs(workspace_limits[2,:])) * .7
-        z_min = np.abs(workspace_limits[2,0])
-        self.start = np.array([rho[0]*m.cos(phi), rho[0]*m.sin(phi), np.random.rand()*z_range - z_min])
-        self.goal = np.array([rho[0]*m.cos(phi+phi2), rho[0]*m.sin(phi+phi2), np.random.rand()*z_range - z_min])
-        v_vec = (self.goal - self.start) / np.linalg.norm((self.goal - self.start))
-        self.vel = (.5*np.random.rand()+.5)*max_obj_vel*v_vec
-        self.tf = np.linalg.norm(self.goal - self.start) / np.linalg.norm(self.vel)
-        self.curr_pos = self.start
-        self.t = 0 # an interger defining the time step 
-        self.dt = dt # time between time steps
-        if not np.all(np.abs(self.start)-self.radius <= workspace_limits[:,1]):
-            print('starting point out of workspace')
-        if not np.all(np.abs(self.start)-self.radius <= workspace_limits[:,1]):
-            print('end point is out of workspace')
-
-    def set_pos(self, pos):
-        self.curr_pos = pos
-        
-    def path(self, t, set_new_pos=False):
-        goal = self.goal
-        start = self.start
-        tf = self.tf
-        
-        
-        # letting the object always move around 
-        x = t*(goal[0]-start[0])/tf + start[0]
-        y = t*(goal[1]-start[1])/tf + start[1]
-            
-        if set_new_pos == True:
-            self.set_pos(np.array([x,y]))
-            
-        return np.array([x,y])
-
-    def step(self, time_step=None):
-        if time_step == None:
-            self.t = self.t + 1
-            time_step = self.t 
-        else:
-            self.t = time_step
-
-        if time_step*self.dt < self.tf:
-            self.curr_pos = self.curr_pos + self.vel*self.dt
-        else:
-            self.curr_pos = self.goal
-
-    def get_coord_list(self, res=res, make_plot=False, return_data=False):
-
-        def check_range(point, limits=workspace_limits):
-            if np.all(point >= limits[:,0]) and np.all(point<=limits[:,1]):
-                return True 
-            else:
-                return False
-
-        def y_solve(x,z,r,pos):
-            x_c,y_c,z_c = pos[0],pos[1],pos[2]
-            return np.sqrt(np.abs(r**2 - (z-z_c)**2 - (x-x_c)**2))
-
-        def r_solve(z,r,z_c):
-            return np.sqrt(np.abs(r**2 - (z-z_c)**2))
-
-        if np.all(np.abs(self.curr_pos)-self.radius <= workspace_limits[:,1]):
-            coord_list = []
-            feat_list = []
-            z = self.curr_pos[2] - self.radius
-            while z <= self.curr_pos[2] + self.radius:
-                # perp distance from x-axis to sphere surface 
-                r_slice = r_solve(z,self.radius,self.curr_pos[2])
-                if np.round(r_slice,2) > 0:
-                    x = self.curr_pos[0] - r_slice
-                    while x <= self.curr_pos[0] + r_slice:
-                        y = self.curr_pos[1] + y_solve(x,z,self.radius,self.curr_pos)
-                        point = np.round(np.array([x,y,z]),2)
-                        if check_range(point):
-                            if return_data:
-                                coord_list.append(np.hstack([self.t,point]))
-                                feat_list.append(1)
-                            else:
-                                coord_list.append(np.hstack([self.t,quantize(point)]))
-                                feat_list.append(1)
-                        x = x + res
-                    x = self.curr_pos[0] + r_slice # reset x
-                    while x >= self.curr_pos[0] - r_slice:
-                        y = self.curr_pos[1] - y_solve(x,z,self.radius,self.curr_pos)
-                        point = np.round(np.array([x,y,z]),2)
-                        if check_range(point):
-                            if return_data:
-                                coord_list.append(np.hstack([self.t,point]))
-                                feat_list.append(1)
-                            else:
-                                coord_list.append(np.hstack([self.t,quantize(point)]))
-                                feat_list.append(1)
-                        x = x - res
-                    z = z + res
-                else:
-                    x_c,y_c = self.curr_pos[0], self.curr_pos[1]
-                    point = np.array([x_c,y_c,z])
-                    if check_range(point):
-                        if return_data:
-                            coord_list.append(np.hstack([self.t,point]))
-                            feat_list.append(1)
-                        else:
-                            coord_list.append(np.hstack([self.t,quantize(point)]))
-                            feat_list.append(1)
-                    z = z + res
-        else:
-            print('object out of range')
-            return
-
-        if make_plot:
-            coord_list2 = np.array(coord_list)
-            xx = coord_list2[:,0]
-            yy = coord_list2[:,1]
-            zz = coord_list2[:,2]
-            fig = plt.figure()
-            ax = plt.axes(projection='3d')
-            ax.plot3D(xx,yy,zz)
-            ax.scatter3D(xx,yy,zz,alpha=.5)
-            ax.set_xlabel('x-axis')
-            ax.set_ylabel('y-axis')
-            ax.set_zlabel('z-axis')
-            # ax.axes.set_xlim3d(left=self.curr_pos[0] - 1.5*r, right=self.curr_pos[0] + 1.5*r) 
-            # ax.axes.set_ylim3d(bottom=self.curr_pos[1] - 1.5*r, top=self.curr_pos[1] + 1.5*r) 
-            # ax.axes.set_zlim3d(bottom=self.curr_pos[2] - 1.5*r, top=self.curr_pos[2] + 1.5*r)
-            plt.show()
-        
-        return np.vstack(coord_list), np.vstack(feat_list)
-
-    def render(self):
-        u = np.linspace(0,2*np.pi,20)
-        v = np.linspace(0,np.pi,20)
-
-        x = self.radius * np.outer(np.cos(u),np.sin(v)) + self.curr_pos[0]
-        y = self.radius * np.outer(np.sin(u),np.sin(v)) + self.curr_pos[1]
-        z = self.radius * np.outer(np.ones(np.size(u)), np.cos(v)) + self.curr_pos[2]
-
-        return x,y,z
 
 class defined_object():
     def __init__(self, start, goal, vel, object_radius=.03):
