@@ -18,7 +18,7 @@ class Actor(ME.MinkowskiNetwork):
             ME.MinkowskiReLU()
         )
         self.pooling = ME.MinkowskiGlobalPooling()
-        self.linear = ME.MinkowskiLinear(128, out_feat)
+        self.linear = ME.MinkowskiLinear(64, out_feat)
 
     def forward(self,x):
         x = self.conv1(x)
@@ -37,7 +37,8 @@ feats = np.vstack([feat1,feat2])
 coords,feats = ME.utils.sparse_collate([coords],[feats])
 
 input = ME.SparseTensor(feats,coords)
-
-net = Actor(in_feat=1, out_feat=1, D=4)
-net.forward(input)
-# print(input.shape)
+input.float()
+print(input.dtype)
+net = Actor(in_feat=3, out_feat=1, D=4)
+print(net.forward(input))
+print(input.shape)
