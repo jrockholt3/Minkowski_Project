@@ -4,7 +4,7 @@ import mpl_toolkits.mplot3d.axes3d as p3
 import matplotlib.animation as animation
 import Robot_Env
 from Robot_Env import dt
-from Robot3D import rand_object 
+from Object import rand_object
 from Robot3D import workspace_limits as lims 
 # Fixing random state for reproducibility
 

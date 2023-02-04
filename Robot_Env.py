@@ -1,7 +1,7 @@
 import numpy as np
 import Robot3D as Robot
 from math import atan2
-from Robot3D import rand_object
+from Object import rand_object
 
 # global variables
 dt = 0.02 # time step
@@ -107,7 +107,6 @@ class observation_space():
 class RobotEnv():
     def __init__(self):
         self.robot = Robot.robot_3link()
-        self.obj = Robot.rand_object()
         s = np.random.choice(4)
         g = np.random.choice(4)
         while s == g:
