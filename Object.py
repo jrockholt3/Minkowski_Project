@@ -7,7 +7,7 @@ from helpers import quantize
 
 class rand_object():
     def __init__(self,object_radius=.03,dt=.01, res=0.01, max_obj_vel = 1.2, \
-                label=np.array([0,1,0]),workspace_limits=np.array([[-.6,.6],[-.6,.6],[0,.9]])):
+                label=-1,workspace_limits=np.array([[-.6,.6],[-.6,.6],[0,.9]])):
         self.radius = object_radius
         self.res = res
         self.t = 0 # an interger defining the time step 
@@ -157,7 +157,7 @@ class rand_object():
 
 
 class Cylinder():
-    def __init__(self, r=.05, L=.3, res=.01/1.5, label=np.array([1,0,0])):
+    def __init__(self, r=.05, L=.3, res=.01/1.5, label=1):
         self.r = r 
         self.L = L
         self.res = res
