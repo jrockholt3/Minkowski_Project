@@ -146,12 +146,12 @@ class rand_object():
 
 
 class Cylinder():
-    def __init__(self, r=.03, L=.3, res=.01, label=1.0, workspace=np.array([[-.6,.6],[-.6,.6],[0,.9]])):
+    def __init__(self, r=.05, L=.3, res=.01, label=1.0, workspace=torch.tensor([[-.6,.6],[-.6,.6],[0,.9]])):
         self.r = r 
         self.L = L
         self.res = res
         self.original = self.make_cloud()
-        self.cloud = self.original.copy()
+        self.cloud = self.original.clone()
         self.label = label
         self.workspace = workspace
 
@@ -166,15 +166,15 @@ class Cylinder():
             x = -self.r 
             while x <= self.r: # positive y values
                 y = circle_solve(x, self.r)
-                points.append(np.array([x,y,z,1]))
+                points.append(torch.tensor([x,y,z,1]))
                 x += self.res
             while x >= -self.r: # negative y values
                 y = -1*circle_solve(x,self.r)
-                points.append(np.array([x,y,z,1]))
+                points.append(torch.tensor([x,y,z,1]))
                 x += -1*self.res
             z += self.res
         
-        return np.vstack(points).T
+        return torch.vstack(points).T
 
     def transform(self, T):
         self.cloud = T@self.original
@@ -210,8 +210,9 @@ class Cylinder():
     def get_coord_list(self, t, T):
         coord_list = []
         feat_list = []
-        for i in range(self.cloud.shape[1]):
-            arr_i = T@self.cloud[:,i]
+        T = torch.tensor(T)
+        for i in range(self.original.shape[1]):
+            arr_i = torch.matmul(T,self.original[:,i])
             coord_list.append(torch.hstack([torch.tensor([t]),quantize(arr_i[0:3],res=self.res)]))
             feat_list.append(torch.tensor(self.label))
         return torch.vstack(coord_list), torch.vstack(feat_list)

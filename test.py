@@ -13,35 +13,36 @@ from spare_tnsr_replay_buffer import ReplayBuffer
 from time import time
 import torch
 import torch.nn as nn
-import MinkowskiEngine as ME
-from Networks import Actor
+# import MinkowskiEngine as ME
+# from Networks import Actor
 
-net = Actor(1,3,D=4)
+# net = Actor(1,3,D=4)
 
 robot = Robot3D.robot_3link()
 obj = rand_object()
-
+print(robot.body2.cloud.shape)
 robot.set_pose(np.array([0, np.pi/4, -1*np.pi/3]))
 # robot.forward(make_plot=True)
-# robot_coords,robot_feat = robot.get_coord_list()
-# obj_coords, obj_feat = obj.get_coord_list()
+robot_coords,robot_feat = robot.get_coord_list()
+obj_coords, obj_feat = obj.get_coord_list()
+print(obj_coords.shape)
 # coords = torch.vstack([robot_coords,obj_coords])
 # feats = torch.vstack([robot_feat, obj_feat])
 
 # coords, feats = ME.utils.sparse_collate([coords],[feats])
 # A = ME.SparseTensor(coordinates=coords, features=feats)
-n = 100
+n = 10
 t = 0
-net.eval()
+# net.eval()
 for i in range(n):
     t1 = time()
     robot_coords,robot_feat = robot.get_coord_list()
-    obj_coords, obj_feat = obj.get_coord_list()
+    # obj_coords, obj_feat = obj.get_coord_list()
     coords = torch.vstack([robot_coords,obj_coords])
     feats = torch.vstack([robot_feat,obj_feat])
-    coords, feats = ME.utils.sparse_collate([coords],[feats])
-    A = ME.SparseTensor(coordinates=coords, features=feats, device='cuda')
-    action = net.forward(A)
+    # coords, feats = ME.utils.sparse_collate([coords],[feats])
+    # A = ME.SparseTensor(coordinates=coords, features=feats, device='cuda')
+    # action = net.forward(A)
     t2 = time()
     t += t2 - t1
 
