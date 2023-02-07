@@ -1,13 +1,14 @@
 import numpy as np
 import math as m
-# import matplotlib.pyplot as plt
-# from mpl_toolkits import mplot3d
+import torch
+import matplotlib.pyplot as plt
+from mpl_toolkits import mplot3d
 from helpers import quantize 
 
 
 class rand_object():
     def __init__(self,object_radius=.03,dt=.01, res=0.01, max_obj_vel = 1.2, \
-                label=-1,workspace_limits=np.array([[-.6,.6],[-.6,.6],[0,.9]])):
+                label=-1.0,workspace_limits=np.array([[-.6,.6],[-.6,.6],[0,.9]])):
         self.radius = object_radius
         self.res = res
         self.t = 0 # an interger defining the time step 
@@ -92,10 +93,10 @@ class rand_object():
                         point = np.round(np.array([x,y,z]),2)
                         if check_range(point):
                             if return_data:
-                                coord_list.append(np.hstack([self.t,point]))
+                                coord_list.append(torch.tensor([self.t,point]))
                                 feat_list.append(self.label)
                             else:
-                                coord_list.append(np.hstack([self.t,quantize(point)]))
+                                coord_list.append(torch.hstack([torch.tensor([self.t],dtype=torch.float),quantize(point)]))
                                 feat_list.append(self.label)
                         x = x + self.res
                     x = self.curr_pos[0] + r_slice # reset x
@@ -104,10 +105,10 @@ class rand_object():
                         point = np.round(np.array([x,y,z]),2)
                         if check_range(point):
                             if return_data:
-                                coord_list.append(np.hstack([self.t,point]))
+                                coord_list.append(torch.tensor([self.t,point]))
                                 feat_list.append(self.label)
                             else:
-                                coord_list.append(np.hstack([self.t,quantize(point)]))
+                                coord_list.append(torch.hstack([torch.tensor([self.t],dtype=torch.float),quantize(point)]))
                                 feat_list.append(self.label)
                         x = x - self.res
                     z = z + self.res
@@ -116,10 +117,10 @@ class rand_object():
                     point = np.array([x_c,y_c,z])
                     if check_range(point):
                         if return_data:
-                            coord_list.append(np.hstack([self.t,point]))
+                            coord_list.append(torch.tensor([self.t,point]))
                             feat_list.append(self.label)
                         else:
-                            coord_list.append(np.hstack([self.t,quantize(point)]))
+                            coord_list.append(torch.hstack([torch.tensor([self.t],dtype=torch.float),quantize(point)]))
                             feat_list.append(self.label)
                     z = z + self.res
         else:
@@ -157,7 +158,7 @@ class rand_object():
 
 
 class Cylinder():
-    def __init__(self, r=.05, L=.3, res=.01/1.5, label=1):
+    def __init__(self, r=.05, L=.3, res=.01/1.5, label=1.0):
         self.r = r 
         self.L = L
         self.res = res
@@ -219,7 +220,7 @@ class Cylinder():
         coord_list = []
         feat_list = []
         for i in range(arr.shape[1]):
-            coord_list.append(np.hstack([t,quantize(arr[:,i],res=self.res)]))
+            coord_list.append(torch.hstack([torch.tensor(t),quantize(arr[:,i],res=self.res)]))
             feat_list.append(self.label)
         return np.vstack(coord_list), np.vstack(feat_list)
 
