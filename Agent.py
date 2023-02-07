@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 from torch.optim import NAdam
+import numpy as np
 import MinkowskiEngine as ME
 from spare_tnsr_replay_buffer import ReplayBuffer
 from Networks import Actor, Critic
@@ -55,8 +56,27 @@ class Agent():
                                 (1-tau)*target_actor_dict[name].clone()
         self.target_actor.load_state_dict(actor_dict)
 
-    def get_action(self, net_input, jnt_err):
+    def get_action(self, net_input, jnt_err, evaluate=False):
         self.actor.eval()
+        actions = self.actor(net_input, jnt_err)
+        if not evaluate:
+            e = np.random.random()
+            if e <= self.e:
+                noise = self.enoise
+            else:
+                noise = self.noise
+            mean = torch.zeros_like(actions)
+            actions += torch.normal(mean,noise)
+        self.actor.train()
+        actions = torch.clip(actions,min=self.min_action,max=self.max_action)
+        return actions
+
+    def remember(self, state, action, reward, new_state, done):
+        self.memory.store_transition(state,action,reward,new_state,done)
+
+    def learn(self):
+        if self.memory.mem_cntr < self.batch_size:
+            return
+
+        state, action, reward, new_state, done = self.memory.sample_buffer(self.batch_size)
         
-
-

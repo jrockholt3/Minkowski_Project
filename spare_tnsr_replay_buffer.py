@@ -1,5 +1,6 @@
 import numpy as np
 import pickle 
+import torch
 
 class ReplayBuffer:
     def __init__(self, max_size, jnt_d, time_d, file='replay_buffer'):
@@ -8,19 +9,19 @@ class ReplayBuffer:
         self.mem_cntr = 0
         self.time_d = time_d # this is the # of time steps that will be looked over
         # coord_memory, feat_memory, and jnt_err all define the state 
-        self.coord_memory = np.empty(max_size, dtype=np.object)
-        self.feat_memory = np.empty(max_size, dtype=np.object)
-        self.jnt_err_memory = np.zeros((self.mem_size, jnt_d))
+        self.coord_memory = np.empty(max_size,dtype=np.object)
+        self.feat_memory = np.empty(max_size,dtype=np.object)
+        self.jnt_err_memory = torch.zeros((self.mem_size, jnt_d))
 
-        self.new_coord_memory = np.empty(max_size, dtype=np.object)
-        self.new_feat_memory = np.empty(max_size, dtype=np.object)
-        self.new_jnt_err_memory = np.zeros((self.mem_size, jnt_d))
+        self.new_coord_memory = np.empty(max_size,dtype=np.object)
+        self.new_feat_memory = np.empty(max_size,dtype=np.object)
+        self.new_jnt_err_memory = torch.zeros((self.mem_size, jnt_d))
 
-        self.action_memory = np.zeros((self.mem_size, jnt_d))
-        self.reward_memory = np.zeros(self.mem_size)
-        self.terminal_memory = np.zeros(self.mem_size, dtype=np.bool)
+        self.action_memory = torch.zeros((self.mem_size, jnt_d))
+        self.reward_memory = torch.zeros(self.mem_size)
+        self.terminal_memory = torch.zeros(self.mem_size, dtype=torch.bool)
         self.file = file
-        self.time_step = np.ones(self.mem_size)*np.inf # variable for sampling buffer
+        self.time_step = torch.ones(self.mem_size)*np.inf # variable for sampling buffer
                                         # will need to go back 'x' # of time steps
                                         # to create the 4D space tensor
                                         # set to np.inf so that all entries do not 
@@ -72,10 +73,10 @@ class ReplayBuffer:
                 else:
                     t = self.time_d + 1
 
-            coord_batch.append(np.vstack(coord_list))
-            feat_batch.append(np.vstack(feat_list))
-            new_coord_batch.append(np.vstack(new_coord_list))
-            new_feat_batch.append(np.vstack(new_feat_list))
+            coord_batch.append(torch.vstack(coord_list))
+            feat_batch.append(torch.vstack(feat_list))
+            new_coord_batch.append(torch.vstack(new_coord_list))
+            new_feat_batch.append(torch.vstack(new_feat_list))
             feat_list = []
             coord_list = []
             new_coord_list = []
@@ -87,8 +88,8 @@ class ReplayBuffer:
         rewards = self.reward_memory[batch]
         dones = self.terminal_memory[batch]
 
-        return (coord_batch, feat_batch, jnt_err), actions, \
-                rewards, (new_coord_batch, new_feat_batch, new_jnt_err), dones
+        return (torch.vstack(coord_batch), torch.vstack(feat_batch), jnt_err), actions, \
+                rewards, (torch.vstack(new_coord_batch), torch.vstack(new_feat_batch), new_jnt_err), dones
         
 
 

@@ -1,8 +1,8 @@
 import numpy as np
 import math as m
 import torch
-import matplotlib.pyplot as plt
-from mpl_toolkits import mplot3d
+# import matplotlib.pyplot as plt
+# from mpl_toolkits import mplot3d
 from helpers import quantize 
 
 
@@ -63,7 +63,7 @@ class rand_object():
         else:
             self.curr_pos = self.goal
 
-    def get_coord_list(self, make_plot=False, return_data=False):
+    def get_coord_list(self, make_plot=False):
         workspace_limits = self.workspace_limits
 
         def check_range(point, limits=workspace_limits):
@@ -92,36 +92,24 @@ class rand_object():
                         y = self.curr_pos[1] + y_solve(x,z,self.radius,self.curr_pos)
                         point = np.round(np.array([x,y,z]),2)
                         if check_range(point):
-                            if return_data:
-                                coord_list.append(torch.tensor([self.t,point]))
-                                feat_list.append(self.label)
-                            else:
-                                coord_list.append(torch.hstack([torch.tensor([self.t],dtype=torch.float),quantize(point)]))
-                                feat_list.append(self.label)
+                            coord_list.append(torch.hstack([torch.tensor([self.t]),quantize(point)]))
+                            feat_list.append(torch.tensor(self.label))
                         x = x + self.res
                     x = self.curr_pos[0] + r_slice # reset x
                     while x >= self.curr_pos[0] - r_slice:
                         y = self.curr_pos[1] - y_solve(x,z,self.radius,self.curr_pos)
                         point = np.round(np.array([x,y,z]),2)
                         if check_range(point):
-                            if return_data:
-                                coord_list.append(torch.tensor([self.t,point]))
-                                feat_list.append(self.label)
-                            else:
-                                coord_list.append(torch.hstack([torch.tensor([self.t],dtype=torch.float),quantize(point)]))
-                                feat_list.append(self.label)
+                            coord_list.append(torch.hstack([torch.tensor([self.t]),quantize(point)]))
+                            feat_list.append(torch.tensor(self.label))
                         x = x - self.res
                     z = z + self.res
                 else:
                     x_c,y_c = self.curr_pos[0], self.curr_pos[1]
                     point = np.array([x_c,y_c,z])
                     if check_range(point):
-                        if return_data:
-                            coord_list.append(torch.tensor([self.t,point]))
-                            feat_list.append(self.label)
-                        else:
-                            coord_list.append(torch.hstack([torch.tensor([self.t],dtype=torch.float),quantize(point)]))
-                            feat_list.append(self.label)
+                        coord_list.append(torch.hstack([torch.tensor([self.t]),quantize(point)]))
+                        feat_list.append(torch.tensor(self.label))
                     z = z + self.res
         else:
             print('object out of range', self.curr_pos)
@@ -144,7 +132,7 @@ class rand_object():
             # ax.axes.set_zlim3d(bottom=self.curr_pos[2] - 1.5*r, top=self.curr_pos[2] + 1.5*r)
             plt.show()
         
-        return np.vstack(coord_list), np.vstack(feat_list)
+        return torch.vstack(coord_list), torch.vstack(feat_list)
 
     def render(self):
         u = np.linspace(0,2*np.pi,20)
@@ -158,13 +146,14 @@ class rand_object():
 
 
 class Cylinder():
-    def __init__(self, r=.05, L=.3, res=.01/1.5, label=1.0):
+    def __init__(self, r=.03, L=.3, res=.01, label=1.0, workspace=np.array([[-.6,.6],[-.6,.6],[0,.9]])):
         self.r = r 
         self.L = L
         self.res = res
         self.original = self.make_cloud()
         self.cloud = self.original.copy()
         self.label = label
+        self.workspace = workspace
 
     def make_cloud(self):
         def circle_solve(x,r):
@@ -196,33 +185,37 @@ class Cylinder():
         zz = self.cloud[2,:]
         fig = plt.figure()
         ax = plt.axes(projection='3d')
-        # ax.axes.set_xlim3d(left=-workspace, right=workspace) 
-        # ax.axes.set_ylim3d(bottom=-workspace, top=workspace) 
-        # ax.axes.set_zlim3d(bottom=0, top=workspace_limits[2,1]) 
+        workspace = self.workspace
+        ax.axes.set_xlim3d(left=workspace[0,0], right=workspace[0,1]) 
+        ax.axes.set_ylim3d(bottom=workspace[1,0], top=workspace[1,1]) 
+        ax.axes.set_zlim3d(bottom=workspace[2,0], top=workspace[2,1]) 
         ax.plot3D(xx,yy,zz)
         plt.show()
 
-    def down_sample(self):
+    def down_sample(self,t,T):
         dic = dict()
         for i in range(1,self.cloud.shape[1]):
-            arr = np.round(self.cloud[:,i],2)
+            arr = np.round(T@self.cloud[:,i])
             tup = (arr[0], arr[1], arr[2])
             dic[tup] = True
 
         coord_list = []
+        feat_list = []
         for k in dic.keys():
-            coord_list.append(np.array([k[0],k[1],k[2]]))
+            coord_list.append(torch.tensor([t,k[0],k[1],k[2]]))
+            feat_list.append(torch.tensor(self.label))
 
-        return np.vstack(coord_list).T
+        return torch.vstack(coord_list), torch.vstack(feat_list)
 
-    def get_coord_list(self, t):
-        arr = self.down_sample()
+    def get_coord_list(self, t, T):
         coord_list = []
         feat_list = []
-        for i in range(arr.shape[1]):
-            coord_list.append(torch.hstack([torch.tensor(t),quantize(arr[:,i],res=self.res)]))
-            feat_list.append(self.label)
-        return np.vstack(coord_list), np.vstack(feat_list)
+        for i in range(self.cloud.shape[1]):
+            arr_i = T@self.cloud[:,i]
+            coord_list.append(torch.hstack([torch.tensor([t]),quantize(arr_i[0:3],res=self.res)]))
+            feat_list.append(torch.tensor(self.label))
+        return torch.vstack(coord_list), torch.vstack(feat_list)
+
 
 
 
@@ -262,3 +255,4 @@ class defined_object():
     
     def contact_point(self, object_pos):
         return -1*approach_vec*self.radius
+

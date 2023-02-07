@@ -107,6 +107,7 @@ class observation_space():
 class RobotEnv():
     def __init__(self):
         self.robot = Robot.robot_3link()
+        self.obj = rand_object()
         s = np.random.choice(4)
         g = np.random.choice(4)
         while s == g:
@@ -128,7 +129,6 @@ class RobotEnv():
         self.Controller = PDControl()
         self.prev_tau = np.array([0,0,0])
 
-        self.obj = rand_object()
 
 
 

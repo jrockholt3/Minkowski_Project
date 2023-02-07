@@ -1,11 +1,11 @@
-# import Robot3D
+import Robot3D
 import numpy as np
 from Robot3D import robot_3link as Robot
 from Object import rand_object
 from Robot3D import workspace_limits as lims
 from Robot3D import workspace
-from mpl_toolkits import mplot3d
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
+# from mpl_toolkits import mplot3d
 # import torch 
 # import MinkowskiEngine as ME
 from helpers import quantize
@@ -14,42 +14,76 @@ from time import time
 import torch
 import torch.nn as nn
 import MinkowskiEngine as ME
+from Networks import Actor
+
+net = Actor(1,3,D=4)
+
+robot = Robot3D.robot_3link()
+obj = rand_object()
+
+robot.set_pose(np.array([0, np.pi/4, -1*np.pi/3]))
+# robot.forward(make_plot=True)
+# robot_coords,robot_feat = robot.get_coord_list()
+# obj_coords, obj_feat = obj.get_coord_list()
+# coords = torch.vstack([robot_coords,obj_coords])
+# feats = torch.vstack([robot_feat, obj_feat])
+
+# coords, feats = ME.utils.sparse_collate([coords],[feats])
+# A = ME.SparseTensor(coordinates=coords, features=feats)
+n = 100
+t = 0
+net.eval()
+for i in range(n):
+    t1 = time()
+    robot_coords,robot_feat = robot.get_coord_list()
+    obj_coords, obj_feat = obj.get_coord_list()
+    coords = torch.vstack([robot_coords,obj_coords])
+    feats = torch.vstack([robot_feat,obj_feat])
+    coords, feats = ME.utils.sparse_collate([coords],[feats])
+    A = ME.SparseTensor(coordinates=coords, features=feats, device='cuda')
+    action = net.forward(A)
+    t2 = time()
+    t += t2 - t1
+
+print('freq is', n/t)
+print('avg time', t/n)
+
 
 # memory = ReplayBuffer(int(1e3),3,50)
-# jnt_err = np.zeros(3)
-# action = jnt_err.copy()
+# jnt_err = torch.zeros(3)
+# action = jnt_err.clone()
 # reward = 0
 
-# obj = Object()
-# t = 0
-# n=100
-# for i in range(n):
-#     t1 = time()
-#     coord_list,feat_list = obj.get_coord_list()
-#     obj.step
-#     t += time() - t1
-# print('method 1 t =', 1/(t/n))
-# print(feat_list.shape)
+# obj = rand_object()
+# # t = 0
+# # n=100
+# # for i in range(n):
+# #     t1 = time()
+# #     coord_list,feat_list = obj.get_coord_list()
+# #     obj.step
+# #     t += time() - t1
+# # print('method 1 t =', 1/(t/n))
+# # print(feat_list.shape)
 
-# xx,yy,zz = obj.render()
-# print(xx.shape, yy.shape, zz.shape)
-# fig = plt.figure()
-# ax = fig.add_subplot(111,projection='3d')
-# ax.plot_surface(xx,yy,zz)
+# # xx,yy,zz = obj.render()
+# # print(xx.shape, yy.shape, zz.shape)
+# # fig = plt.figure()
+# # ax = fig.add_subplot(111,projection='3d')
+# # ax.plot_surface(xx,yy,zz)
 
-# ax.set_xlim3d(lims[0,:])
-# ax.set_xlabel('X')
+# # ax.set_xlim3d(lims[0,:])
+# # ax.set_xlabel('X')
 
-# ax.set_ylim3d(lims[1,:])
-# ax.set_ylabel('Y')
+# # ax.set_ylim3d(lims[1,:])
+# # ax.set_ylabel('Y')
 
-# ax.set_zlim3d(lims[2,:])
-# ax.set_zlabel('Z')
-# plt.show()
+# # ax.set_zlim3d(lims[2,:])
+# # ax.set_zlabel('Z')
+# # plt.show()
 
 # i = 0
 # while i < 200:
-#     obj = Object()
+#     obj = rand_object()
 #     done = False
 #     n = 0
 #     while not done:
@@ -75,6 +109,9 @@ import MinkowskiEngine as ME
 #         i = i + 1
 
 # state, action, reward, new_state, done = memory.sample_buffer(128)
+
+# # print(state[0])
+# print(state[0])
 
 # print(state[0][0])
 # print(len(state[0]))
@@ -107,44 +144,3 @@ import MinkowskiEngine as ME
 # print(coord_mem)
 # print(feat_mem)
 
-
-dense_tensor = torch.rand(3, 4, 11, 11, 11, 11)  # BxCxD1xD2x....xDN
-
-dense_tensor.requires_grad = True
-
-# Since the shape is fixed, cache the coordinates for faster inference
-
-coordinates = ME.dense_coordinates(dense_tensor.shape)
-print(dense_tensor.shape)
-
-network = nn.Sequential(
-
-    # Add layers that can be applied on a regular pytorch tensor
-
-    nn.ReLU(),
-
-    ME.MinkowskiToSparseTensor(coordinates=coordinates),
-
-    ME.MinkowskiConvolution(4, 5, stride=2, kernel_size=3, dimension=4),
-
-    ME.MinkowskiBatchNorm(5),
-
-    ME.MinkowskiReLU(),
-
-    ME.MinkowskiConvolutionTranspose(5, 6, stride=2, kernel_size=3, dimension=4),
-
-    ME.MinkowskiToDenseTensor(
-
-        dense_tensor.shape
-
-    ),  # must have the same tensor stride.
-
-)
-
-for i in range(5):
-
-    print(f"Iteration: {i}")
-
-    output = network(dense_tensor) # returns a regular pytorch tensor
-
-    output.sum().backward()

@@ -2,12 +2,13 @@
 # coding: utf-8
 
 # In[1]:
-
+import torch 
 import numpy as np
 import math as m
-import matplotlib.pyplot as plt
-from mpl_toolkits import mplot3d
+# import matplotlib.pyplot as plt
+# from mpl_toolkits import mplot3d
 from helpers import quantize
+from Object import Cylinder
 
 # Goal is to create a joint space that the robot can operate in. As long as a decision doesn't put it out of this joint space it can go there. This could be constrain by the orientation of the part.   
 
@@ -84,6 +85,8 @@ class robot_3link():
         self.jnt_vel = np.array([0.0, 0.0, 0.0])
         self.traj = np.array([])
         self.label = label
+        self.body2 = Cylinder()
+        self.body3 = Cylinder()
 #        self.th_lim = np.array()
 
     def set_pose(self, th_arr):
@@ -276,6 +279,29 @@ class robot_3link():
         ax.axes.set_ylim3d(bottom=-workspace, top=workspace) 
         ax.axes.set_zlim3d(bottom=0, top=workspace+self.S[0]) 
         plt.show()
+
+    def get_coord_list(self,t=0):
+        T_dict = self.get_transform()
+        T2 = T_dict['2toF']
+        T3 = T_dict['3toF']
+        th = np.pi/2
+        T = np.array([[np.cos(th), 0, np.sin(th), 0],
+                      [0, 1, 0, 0],
+                      [-np.sin(th), 0, np.cos(th), 0],
+                      [0, 0, 0, 1]])
+        # self.body2.transform(T2@T)
+        # self.body3.transform(T3@T)
+        # coord_list2,feat2 = self.body2.get_coord_list(t,T2@T)
+        # coord_list3,feat3 = self.body3.get_coord_list(t,T3@T)
+        coord_list2,feat2 = self.body2.get_coord_list(0,T2@T)
+        coord_list3,feat3 = self.body3.get_coord_list(0,T3@T)
+
+        return torch.vstack([coord_list2, coord_list3]), torch.vstack([feat2, feat3])
+
+
+
+
+
 
 class defined_object():
     def __init__(self, start, goal, vel, object_radius=.03):
