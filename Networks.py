@@ -1,3 +1,4 @@
+import os 
 import torch.nn as nn
 from torch.optim import NAdam
 import MinkowskiEngine as ME
@@ -9,8 +10,10 @@ from spare_tnsr_replay_buffer import ReplayBuffer
 
 class Actor(ME.MinkowskiNetwork):
 
-    def __init__(self, in_feat, n_actions, D):
+    def __init__(self, in_feat, n_actions, D, name, chckpt_dir = 'tmp'):
         super(Actor, self).__init__(D)
+        self.name = name 
+        self.file_path = os.path.join(chckpt_dir,name+'_ddpg')
         conv_out1 = 64
         conv_out2 = 256
         conv_out3 = 256
@@ -81,8 +84,15 @@ class Actor(ME.MinkowskiNetwork):
             y[int(c[0])] = x.features[int(c[0])]
         return y
 
-    def forward(self,x,jnt_err):
-        jnt_err = jnt_err.cuda()
+    def forward(self,state,single_value=False):
+        if single_value:
+            coords,feats = ME.utils.sparse_collate([state[0]],[state[1]])
+            jnt_err = torch.tensor(state[2],device='cuda',dtype=torch.float32)
+            jnt_err = jnt_err.view(1, jnt_err.shape[0])
+        else: 
+            coords,feats = ME.utils.sparse_collate(state[0],state[1])
+            jnt_err = torch.tensor(state[2],device='cuda',dtype=torch.float32)
+        x = ME.SparseTensor(coordinates=coords, features=feats, device='cuda')
         x = self.conv1(x)
         x = self.conv2(x)
         x = self.conv3(x)
@@ -94,10 +104,20 @@ class Actor(ME.MinkowskiNetwork):
         x = self.out(x)
         return x
 
+    def save_checkpoint(self):
+        print('...saving ' + self.name + '...')
+        torch.save(self.state_dict(), self.file_path)
+
+    def load_checkpoint(self):
+        print('...loading ' + self.name + '...')
+        self.load_state_dict(torch.load(self.file_path))
+
 class Critic(ME.MinkowskiNetwork):
 
-    def __init__(self, in_feat, out_dim, D):
+    def __init__(self, in_feat, out_dim, D, name, chckpt_dir='tmp'):
         super(Critic, self).__init__(D)
+        self.name = name 
+        self.file_path = os.path.join(chckpt_dir,name+'_ddpg')
         conv_out1 = 64
         conv_out2 = 256
         conv_out3 = 256
@@ -147,7 +167,7 @@ class Critic(ME.MinkowskiNetwork):
 
         self.pooling = ME.MinkowskiGlobalMaxPooling()
         self.linear = nn.Sequential(
-            nn.Linear(conv_out4+3, layer1_unit),  # plus 3 for jnt_err 
+            nn.Linear(conv_out4+6, layer1_unit),  # plus 6 for jnt_err and action
             nn.BatchNorm1d(layer1_unit)
         )
 
@@ -167,18 +187,34 @@ class Critic(ME.MinkowskiNetwork):
             y[int(c[0])] = x.features[int(c[0])]
         return y
 
-    def forward(self,x,jnt_err):
-        jnt_err = jnt_err.cuda()
+    def forward(self,state,action,single_value=False):
+        if single_value:
+            coords,feats = ME.utils.sparse_collate([state[0]],[state[1]])
+            jnt_err = torch.tensor(state[2],device='cuda',dtype=torch.float32)
+            jnt_err = jnt_err.view(1, jnt_err.shape[0])
+        else: 
+            coords,feats = ME.utils.sparse_collate(state[0],state[1])
+            jnt_err = torch.tensor(state[2],device='cuda',dtype=torch.float32)
+        x = ME.SparseTensor(coordinates=coords, features=feats, device='cuda')
+        action = action.cuda()
         x = self.conv1(x)
         x = self.conv2(x)
         x = self.conv3(x)
         x = self.conv4(x)
         x = self.pooling(x)
         x = self.to_dense_tnsr(x)
-        y = torch.concat((x,jnt_err),dim=1)
+        y = torch.concat((x,jnt_err,action),dim=1)
         x = self.linear(y)
         x = self.out(x)
         return x
+
+    def save_checkpoint(self):
+        print('...saving ' + self.name + '...')
+        torch.save(self.state_dict(), self.file_path)
+
+    def load_checkpoint(self):
+        print('...loading ' + self.name + '...')
+        self.load_state_dict(torch.load(self.file_path))
 
 # memory = ReplayBuffer(int(1e3),3,6)
 # jnt_err = torch.zeros(3)

@@ -15,6 +15,7 @@ import torch.nn as nn
 from Networks import Actor
 from Agent import Agent
 from Robot_Env import RobotEnv
+from collections import OrderedDict
 
 # net = Actor(1,3,D=4)
 
@@ -117,18 +118,7 @@ print(obj_coords.shape)
 
 env = RobotEnv()
 agent = Agent(env)
-print(type(agent.actor))
-print(agent.actor.named_parameters())
-print(agent.critic.named_parameters())
-print(agent.target_actor.named_parameters())
-print(agent.target_critic.named_parameters())
 
-# agent.choose_action(state)
-
-# print(state[0][0])
-# print(len(state[0]))
-
-        
 
 
 # print(np.vstack(coord_list))

@@ -143,7 +143,10 @@ class RobotEnv():
     # need to return the relative positions of the object and the relative vels
     # in terms of the end effector frame of reference.
     def step(self,action):
-        vel_err = action - self.robot.jnt_vel
+        if not isinstance(action,np.ndarray):
+            action = action.cpu()
+            action = action.detach()
+            vel_err = action.numpy() - self.robot.jnt_vel
         tau, dedt = self.Controller.step(vel_err)
         nxt_vel = (tau-damping*self.robot.jnt_vel)*dt + self.robot.jnt_vel
         self.robot.set_jnt_vel(nxt_vel) 
@@ -180,7 +183,7 @@ class RobotEnv():
         feats.append(rob_feats)
         coords = torch.vstack(coords)
         feats = torch.vstack(feats)
-        state = (coords,feats,jnt_err)
+        state = (coords,feats,self.jnt_err)
         return state, reward, done, self.info
 
 
@@ -189,7 +192,19 @@ class RobotEnv():
     
         # state = np.hstack((jnt_err, jnt_err_vel, rel_pos, rel_vel))
         # state = np.hstack((self.jnt_err, self.jnt_err_vel))
-        state = self.jnt_err
+        coords = []
+        feats = []
+        for obj in self.objs:
+            c,f = obj.get_coord_list()
+            coords.append(c)
+            feats.append(f)
+        rob_coords, rob_feats = self.robot.get_coord_list()
+        coords.append(rob_coords)
+        feats.append(rob_feats)
+        coords = torch.vstack(coords)
+        feats = torch.vstack(feats)
+
+        state = (coords,feats,self.jnt_err)
         return state
 
 
