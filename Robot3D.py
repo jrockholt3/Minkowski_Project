@@ -289,10 +289,7 @@ class robot_3link():
                       [0, 1, 0, 0],
                       [-np.sin(th), 0, np.cos(th), 0],
                       [0, 0, 0, 1]])
-        # self.body2.transform(T2@T)
-        # self.body3.transform(T3@T)
-        # coord_list2,feat2 = self.body2.get_coord_list(t,T2@T)
-        # coord_list3,feat3 = self.body3.get_coord_list(t,T3@T)
+
         coord_list2,feat2 = self.body2.get_coord_list(0,T2@T)
         coord_list3,feat3 = self.body3.get_coord_list(0,T3@T)
 

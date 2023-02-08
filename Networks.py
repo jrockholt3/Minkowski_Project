@@ -59,8 +59,15 @@ class Actor(ME.MinkowskiNetwork):
         )
 
         self.pooling = ME.MinkowskiGlobalMaxPooling()
-        self.linear = nn.Linear(conv_out4, layer1_unit)
-        self.out = nn.Linear(layer1_unit,n_actions)
+        self.linear = nn.Sequential(
+            nn.Linear(conv_out4+3, layer1_unit),  # plus 3 for jnt_err 
+            nn.BatchNorm1d(layer1_unit)
+        )
+
+        self.out = nn.Sequential(
+            nn.Linear(layer1_unit,n_actions),
+            nn.Tanh()
+        )
 
         self.optimizer = NAdam(self.parameters())
 
@@ -74,21 +81,22 @@ class Actor(ME.MinkowskiNetwork):
             y[int(c[0])] = x.features[int(c[0])]
         return y
 
-    def forward(self,x):
+    def forward(self,x,jnt_err):
+        jnt_err = jnt_err.cuda()
         x = self.conv1(x)
         x = self.conv2(x)
         x = self.conv3(x)
         x = self.conv4(x)
         x = self.pooling(x)
         x = self.to_dense_tnsr(x)
-        x = self.linear(x)
+        y = torch.concat((x,jnt_err),dim=1)
+        x = self.linear(y)
         x = self.out(x)
         return x
 
-
 class Critic(ME.MinkowskiNetwork):
 
-    def __init__(self, in_feat, D):
+    def __init__(self, in_feat, out_dim, D):
         super(Critic, self).__init__(D)
         conv_out1 = 64
         conv_out2 = 256
@@ -138,10 +146,20 @@ class Critic(ME.MinkowskiNetwork):
         )
 
         self.pooling = ME.MinkowskiGlobalMaxPooling()
-        self.linear = nn.Linear(conv_out4, layer1_unit)
-        self.out = nn.Linear(layer1_unit,1)
+        self.linear = nn.Sequential(
+            nn.Linear(conv_out4+3, layer1_unit),  # plus 3 for jnt_err 
+            nn.BatchNorm1d(layer1_unit)
+        )
+
+        self.out = nn.Sequential(
+            nn.Linear(layer1_unit,out_dim),
+        )
 
         self.optimizer = NAdam(self.parameters())
+
+        self.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cuda:1')
+
+        self.to(self.device)
 
     def to_dense_tnsr(self, x:ME.SparseTensor):
         y = torch.zeros_like(x.features)
@@ -149,49 +167,50 @@ class Critic(ME.MinkowskiNetwork):
             y[int(c[0])] = x.features[int(c[0])]
         return y
 
-    def forward(self,x):
+    def forward(self,x,jnt_err):
+        jnt_err = jnt_err.cuda()
         x = self.conv1(x)
         x = self.conv2(x)
         x = self.conv3(x)
         x = self.conv4(x)
         x = self.pooling(x)
         x = self.to_dense_tnsr(x)
-        x = self.linear(x)
+        y = torch.concat((x,jnt_err),dim=1)
+        x = self.linear(y)
         x = self.out(x)
         return x
 
+# memory = ReplayBuffer(int(1e3),3,6)
+# jnt_err = torch.zeros(3)
+# action = torch.zeros(3)
+# reward = 0
 
-memory = ReplayBuffer(int(1e3),3,6)
-jnt_err = torch.zeros(3)
-action = torch.zeros(3)
-reward = 0
+# i = 0
+# while i < 200:
+#     obj = rand_object()
+#     done = False
+#     n = 0
+#     while not done:
+#         n += 1
+#         coords, feats = obj.get_coord_list()
+#         state = (coords, feats, jnt_err, obj.t)
+#         obj.step()
+#         coords2, feats2 = obj.get_coord_list()
+#         new_state = (coords2, feats2, jnt_err, obj.t)
 
-i = 0
-while i < 200:
-    obj = rand_object()
-    done = False
-    n = 0
-    while not done:
-        n += 1
-        coords, feats = obj.get_coord_list()
-        state = (coords, feats, jnt_err, obj.t)
-        obj.step()
-        coords2, feats2 = obj.get_coord_list()
-        new_state = (coords2, feats2, jnt_err, obj.t)
+#         if obj.t*obj.dt >= obj.tf:
+#             done = True
+#             # print('broke on episode end')
+#         elif n > 1000:
+#             print('broke on over-run')
+#             done = True
+#         else:
+#             done = False
 
-        if obj.t*obj.dt >= obj.tf:
-            done = True
-            # print('broke on episode end')
-        elif n > 1000:
-            print('broke on over-run')
-            done = True
-        else:
-            done = False
-
-        if coords.size == 0 or coords2.size == 0:
-            print('empty array stored')
-        memory.store_transition(state, action, reward, new_state, done)
-        i = i + 1
+#         if coords.size == 0 or coords2.size == 0:
+#             print('empty array stored')
+#         memory.store_transition(state, action, reward, new_state, done)
+#         i = i + 1
 
 # state, action, reward, new_state, done = memory.sample_buffer(128)
 # coords = state[0]

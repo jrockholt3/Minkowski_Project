@@ -2,6 +2,7 @@ import numpy as np
 import Robot3D as Robot
 from math import atan2
 from Object import rand_object
+import torch 
 
 # global variables
 dt = 0.02 # time step
@@ -20,6 +21,8 @@ tau_max =  30 #J*rad/s^2, J = 1
 damping = tau_max*.5
 P = 10
 D = 50
+
+jnt_vel_max = np.pi/1.5 # rad/s
 
 def a(list):
     return np.array(list)
@@ -72,6 +75,12 @@ def angle_calc(th):
     c = np.cos(th)
     return np.arctan2(s,c)
 
+def gen_rand_pos():
+    vec = (2*np.random.rand(3) - 1)
+    mag = .4*np.random.rand() + .2
+    goal = mag * .999 * (vec/np.linalg.norm(vec)) + np.array([0,0,.3])
+    return goal 
+
 class PDControl():
     def __init__(self, P=P, D=D, tau_max=tau_max, dt=dt, damping=damping):
         self.P = P
@@ -89,15 +98,14 @@ class PDControl():
         tau = np.clip(tau, -self.tau_mx, self.tau_mx)
         return tau, dedt
 
-
 class action_space():
     def __init__(self):
         self.shape = np.array([3]) # three joint angles adjustments
-        self.high = np.ones(3) * tau_max
-        self.low = np.ones(3) * -tau_max
+        self.high = torch.ones(3).cuda() * jnt_vel_max
+        self.low = torch.ones(3).cuda() * -jnt_vel_max
 
     def sample(self):
-        return 2*np.random.rand(3) - 0.5
+        return 2*torch.rand(3) - 0.5
 
 class observation_space():
     def __init__(self):
@@ -105,37 +113,38 @@ class observation_space():
                                     # [th1, th2, th3, w1, w2, w3]
 
 class RobotEnv():
+    # have to generate random poses
     def __init__(self):
         self.robot = Robot.robot_3link()
-        self.obj = rand_object()
-        s = np.random.choice(4)
-        g = np.random.choice(4)
-        while s == g:
-            g = np.random.choice(4)
-        self.start = np.array([0,np.pi/4,-np.pi/2])
-        self.goal = np.array([-np.pi/3, np.pi/12, -np.pi/3])
-        self.robot.set_pose(self.start)
-        self.shape = 10
+        self.objs = [rand_object(), rand_object(), rand_object()]
         self.action_space = action_space()
         self.observation_space = observation_space()
+        self.reward_range = [0, -np.inf]
+        self.Controller = PDControl()
+
+        # setting runtime variables 
+        s = gen_rand_pos()
+        g = gen_rand_pos()
+        th_arr = self.robot.reverse(goal=s)
+        self.start = th_arr[:,0]
+        th_arr = self.robot.reverse(goal=g)
+        self.goal = th_arr[:,0]
+        self.robot.set_pose(self.start)
         self.done = False
         self.jerk_sum = 0
         self.t_sum = 0
         self.jnt_err_sum = 0
         self.info = {}
-        self.reward_range = [0, -np.inf]
         self.jnt_err = calc_jnt_err(self.robot.pos, self.goal) 
         self.jnt_err_vel = np.array([0,0,0])
-        self.Controller = PDControl()
         self.prev_tau = np.array([0,0,0])
-
-
 
 
     # need to return the relative positions of the object and the relative vels
     # in terms of the end effector frame of reference.
-    def step(self):
-        tau, dedt = self.Controller.step(self.jnt_err)
+    def step(self,action):
+        vel_err = action - self.robot.jnt_vel
+        tau, dedt = self.Controller.step(vel_err)
         nxt_vel = (tau-damping*self.robot.jnt_vel)*dt + self.robot.jnt_vel
         self.robot.set_jnt_vel(nxt_vel) 
         nxt_pos = angle_calc(dt * self.robot.jnt_vel + self.robot.pos)
@@ -159,10 +168,20 @@ class RobotEnv():
 
         reward = -Alpha * np.linalg.norm(self.jnt_err) + bonus
 
-        # state = np.hstack((self.jnt_err, self.jnt_err_vel)) #, rel_pos, rel_vel))
-        state = jnt_err
-        # return state, reward, done, done, self.info
-        return self.t_sum, self.robot.pos, done, 
+        self.obj.step()
+        coords = []
+        feats = []
+        for obj in self.objs:
+            c,f = obj.get_coord_list()
+            coords.append(c)
+            feats.append(f)
+        rob_coords, rob_feats = self.robot.get_coord_list()
+        coords.append(rob_coords)
+        feats.append(rob_feats)
+        coords = torch.vstack(coords)
+        feats = torch.vstack(feats)
+        state = (coords,feats,jnt_err)
+        return state, reward, done, self.info
 
 
     def reset(self):

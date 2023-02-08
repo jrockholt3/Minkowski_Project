@@ -88,7 +88,7 @@ class ReplayBuffer:
         rewards = self.reward_memory[batch]
         dones = self.terminal_memory[batch]
 
-        return (torch.vstack(coord_batch), torch.vstack(feat_batch), jnt_err), actions, \
+        return (coord_batch, feat_batch, jnt_err), actions, \
                 rewards, (torch.vstack(new_coord_batch), torch.vstack(new_feat_batch), new_jnt_err), dones
         
 

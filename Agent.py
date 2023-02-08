@@ -9,7 +9,7 @@ import Robot_Env
 import pickle
 
 class Agent():
-    def __init__(self, input_dims, alpha=0.001,beat=0.002,env=None, 
+    def __init__(self, env, alpha=0.001,beat=0.002, 
                     gamma=.99, n_actions=3, time_d=6, max_size=int(1e6), tau=0.005,
                     batch_size=128,noise=.01,e=.1,enoise=.3):
         self.gamma = gamma
@@ -19,18 +19,38 @@ class Agent():
         self.noise = noise
         self.e = e
         self.enoise = enoise
-        self.max_action = env.action_space.high[0]
-        self.min_action = env.action_space.low[0]
+        self.max_action = env.action_space.high
+        self.min_action = env.action_space.low
         self.tau = tau
         self.score_avg = 0
         self.best_score = 0
 
         self.actor = Actor(1,n_actions,4)
-        self.critic = Critic(1,4)
+        self.critic = Critic(1,1,4)
         self.target_actor = Actor(1,n_actions,4)
-        self.target_critic = Critic(1,4)
+        self.target_critic = Critic(1,1,4)
 
         self.update_network_params(tau=1)
+
+    def choose_action(self, state, evaluate=False):
+        self.actor.eval()
+        coords,feats = ME.utils.sparse_collate(state[0],state[1])
+        A = ME.SparseTensor(coordinates=coords, features=feats,device='cuda')
+        action = self.actor.forward(A,state[2])
+
+        if not evaluate:
+            e = np.random.random()
+            if e <= self.e:
+                noise = self.enoise
+            else:
+                noise = self.noise
+            action += torch.normal(torch.zeros_like(action),std=noise)
+
+        action = torch.clip(action,self.min_action, self.max_action)
+        return action
+
+
+        
 
     def update_network_params(self, tau=None):
         if tau is None:

@@ -192,20 +192,20 @@ class Cylinder():
         ax.plot3D(xx,yy,zz)
         plt.show()
 
-    def down_sample(self,t,T):
-        dic = dict()
-        for i in range(1,self.cloud.shape[1]):
-            arr = np.round(T@self.cloud[:,i])
-            tup = (arr[0], arr[1], arr[2])
-            dic[tup] = True
+    # def down_sample(self,t,T):
+    #     dic = dict()
+    #     for i in range(1,self.cloud.shape[1]):
+    #         arr = np.round(T@self.cloud[:,i])
+    #         tup = (arr[0], arr[1], arr[2])
+    #         dic[tup] = True
 
-        coord_list = []
-        feat_list = []
-        for k in dic.keys():
-            coord_list.append(torch.tensor([t,k[0],k[1],k[2]]))
-            feat_list.append(torch.tensor(self.label))
+    #     coord_list = []
+    #     feat_list = []
+    #     for k in dic.keys():
+    #         coord_list.append(torch.tensor([t,k[0],k[1],k[2]]))
+    #         feat_list.append(torch.tensor(self.label))
 
-        return torch.vstack(coord_list), torch.vstack(feat_list)
+    #     return torch.vstack(coord_list), torch.vstack(feat_list)
 
     def get_coord_list(self, t, T):
         coord_list = []
