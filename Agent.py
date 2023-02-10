@@ -8,11 +8,22 @@ from spare_tnsr_replay_buffer import ReplayBuffer
 from Networks import Actor, Critic
 import Robot_Env
 import pickle
+import gc 
+
+def check_memory():
+    q = 0
+    for obj in gc.get_objects():
+        try:  
+            if torch.is_tensor(obj) or (hasattr(obj, 'data') and torch.is_tensor(obj.data)):
+                q += 1
+        except:
+            pass
+    return q 
 
 class Agent():
     def __init__(self, env, alpha=0.001,beat=0.002, 
                     gamma=.99, n_actions=3, time_d=6, max_size=int(1e6), tau=0.005,
-                    batch_size=128,noise=.01,e=.1,enoise=.3):
+                    batch_size=64,noise=.01,e=.1,enoise=.3):
         self.gamma = gamma
         self.memory = ReplayBuffer(max_size,n_actions,time_d)
         self.batch_size = batch_size
@@ -30,12 +41,16 @@ class Agent():
         self.critic = Critic(1,1,4,name='critic')
         self.target_actor = Actor(1,n_actions,4,name='targ_actor')
         self.target_critic = Critic(1,1,4,name='targ_critic')
-
+        self.critic_criterion = nn.MSELoss()
         self.update_network_params(tau=1) # hard copy
 
     def choose_action(self, state, evaluate=False):
         self.actor.eval()
-        action = self.actor.forward(state,single_value=True)
+        # q = check_memory()
+        x,jnt_err = self.actor.preprocessing(state,single_value=True)
+        # print('preprocessing added',check_memory()-q)
+        action = self.actor.forward(x,jnt_err)
+        # print('forward pass added',check_memory()-q)
 
         if not evaluate:
             e = np.random.random()
@@ -46,6 +61,7 @@ class Agent():
             action += torch.normal(torch.zeros_like(action),std=noise)
 
         action = torch.clip(action,self.min_action, self.max_action)
+        del x,jnt_err,state
         return action
 
     def update_network_params(self, tau=None):
@@ -74,23 +90,8 @@ class Agent():
                                 (1-tau)*target_actor_dict[name].clone()
         self.target_actor.load_state_dict(actor_dict)
 
-    def get_action(self, net_input, jnt_err, evaluate=False):
-        self.actor.eval()
-        actions = self.actor(net_input, jnt_err)
-        if not evaluate:
-            e = np.random.random()
-            if e <= self.e:
-                noise = self.enoise
-            else:
-                noise = self.noise
-            mean = torch.zeros_like(actions)
-            actions += torch.normal(mean,noise)
-        self.actor.train()
-        actions = torch.clip(actions,min=self.min_action,max=self.max_action)
-        return actions
-
-    def remember(self, state, action, reward, new_state, done):
-        self.memory.store_transition(state,action,reward,new_state,done)
+    def remember(self, state, action, reward, new_state, done,n):
+        self.memory.store_transition(state,action,reward,new_state,done,n)
 
     def learn(self):
         if self.memory.mem_cntr < self.batch_size:
@@ -101,18 +102,25 @@ class Agent():
         self.target_actor.eval()
         self.target_critic.eval()
         self.critic.eval()
-        target_actions = self.target_actor.forward(new_state)
-        critic_value_ = self.target_critic.forward(new_state, target_actions)
-        critic_value = self.critic.forward(state, action)
+
+        # target actions
+        x,jnt_err = self.target_actor.preprocessing(state)
+        target_actions = self.target_actor.forward(x,jnt_err)
+        # target critic value
+        x,jnt_err,target_actions = self.target_critic.preprocessing(new_state, target_actions)
+        critic_value_ = self.target_critic.forward(x,jnt_err,target_actions)
+        # critic value
+        x,jnt_err,action = self.target_critic.preprocessing(new_state, target_actions)
+        critic_value = self.target_critic.forward(x,jnt_err,action)
 
         target=[]
         for j in range(self.batch_size):
             target.append(reward[j] + self.gamma*critic_value_[j]*done[j])
-
+        target = torch.vstack(target)
         
         self.critic.train()
         self.critic.optimizer.zero_grad()
-        critic_loss = F.mse_loss(target, critic_value)
+        critic_loss = self.critic_criterion(target,critic_value)
         critic_loss.backward()
         self.critic.optimizer.step()
 
@@ -121,9 +129,14 @@ class Agent():
 
         self.critic.eval()
         self.actor.optimizer.zero_grad()
-        mu = self.actor.forward(state)
+        # actions
+        x,jnt_err = self.actor.preprocessing(state)
+        mu = self.actor.forward(x,jnt_err)
+
         self.actor.train()
-        actor_loss = -self.critic.forward(state, mu)
+        # actor loss
+        x,jnt_err,mu = self.critic.preprocessing(state,mu)
+        actor_loss = -self.critic.forward(x,jnt_err, mu)
         actor_loss = torch.mean(actor_loss)
         actor_loss.backward()
         self.actor.optimizer.step()
@@ -133,7 +146,7 @@ class Agent():
     def save_models(self):
         self.actor.save_checkpoint()
         self.critic.save_checkpoint()
-        self.target_actor.save_checkpoint
+        self.target_actor.save_checkpoint()
         self.target_critic.save_checkpoint()
 
     def load_models(self):

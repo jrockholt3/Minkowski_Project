@@ -49,7 +49,6 @@ class Actor(ME.MinkowskiNetwork):
             ME.MinkowskiBatchNorm(conv_out3),
             ME.MinkowskiSELU()
         )
-
         self.conv4 = nn.Sequential(
             ME.MinkowskiConvolution(in_channels=conv_out3,
                 out_channels=conv_out4,
@@ -60,22 +59,18 @@ class Actor(ME.MinkowskiNetwork):
             ME.MinkowskiBatchNorm(conv_out4),
             ME.MinkowskiSELU()
         )
-
         self.pooling = ME.MinkowskiGlobalMaxPooling()
         self.linear = nn.Sequential(
             nn.Linear(conv_out4+3, layer1_unit),  # plus 3 for jnt_err 
             nn.BatchNorm1d(layer1_unit)
         )
-
         self.out = nn.Sequential(
             nn.Linear(layer1_unit,n_actions),
             nn.Tanh()
         )
 
         self.optimizer = NAdam(self.parameters())
-
         self.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cuda:1')
-
         self.to(self.device)
 
     def to_dense_tnsr(self, x:ME.SparseTensor):
@@ -84,28 +79,33 @@ class Actor(ME.MinkowskiNetwork):
             y[int(c[0])] = x.features[int(c[0])]
         return y
 
-    def forward(self,state,single_value=False):
+    def preprocessing(self,state,single_value=False):
         if single_value:
             coords,feats = ME.utils.sparse_collate([state[0]],[state[1]])
-            jnt_err = torch.tensor(state[2],device='cuda',dtype=torch.float32)
-            jnt_err = jnt_err.view(1, jnt_err.shape[0])
+            jnt_err = state[2].float().view(1,state[2].shape[0])
+            # torch.tensor(state[2],device='cuda',dtype=torch.float32).view(1,state[2].shape[0])
         else: 
             coords,feats = ME.utils.sparse_collate(state[0],state[1])
-            jnt_err = torch.tensor(state[2],device='cuda',dtype=torch.float32)
-        x = ME.SparseTensor(coordinates=coords, features=feats, device='cuda')
+            jnt_err = state[2].float()
+            # torch.tensor(state[2],device='cuda',dtype=torch.float32)
+
+        x = ME.SparseTensor(coordinates=coords, features=feats,device='cuda')
+        return x,jnt_err
+
+    def forward(self,x,jnt_err):
         x = self.conv1(x)
         x = self.conv2(x)
         x = self.conv3(x)
         x = self.conv4(x)
         x = self.pooling(x)
         x = self.to_dense_tnsr(x)
-        y = torch.concat((x,jnt_err),dim=1)
-        x = self.linear(y)
+        x = torch.cat((x,jnt_err.cuda()),dim=1)
+        x = self.linear(x)
         x = self.out(x)
         return x
 
     def save_checkpoint(self):
-        print('...saving ' + self.name + '...')
+        # print('...saving ' + self.name + '...')
         torch.save(self.state_dict(), self.file_path)
 
     def load_checkpoint(self):
@@ -153,7 +153,6 @@ class Critic(ME.MinkowskiNetwork):
             ME.MinkowskiBatchNorm(conv_out3),
             ME.MinkowskiSELU()
         )
-
         self.conv4 = nn.Sequential(
             ME.MinkowskiConvolution(in_channels=conv_out3,
                 out_channels=conv_out4,
@@ -164,52 +163,53 @@ class Critic(ME.MinkowskiNetwork):
             ME.MinkowskiBatchNorm(conv_out4),
             ME.MinkowskiSELU()
         )
-
         self.pooling = ME.MinkowskiGlobalMaxPooling()
         self.linear = nn.Sequential(
             nn.Linear(conv_out4+6, layer1_unit),  # plus 6 for jnt_err and action
             nn.BatchNorm1d(layer1_unit)
         )
-
         self.out = nn.Sequential(
             nn.Linear(layer1_unit,out_dim),
         )
 
         self.optimizer = NAdam(self.parameters())
-
         self.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cuda:1')
-
         self.to(self.device)
 
     def to_dense_tnsr(self, x:ME.SparseTensor):
         y = torch.zeros_like(x.features)
         for c in x.coordinates:
-            y[int(c[0])] = x.features[int(c[0])]
+            y[int(c[0])] = x.features[int(c[0])].clone()
         return y
 
-    def forward(self,state,action,single_value=False):
+    def preprocessing(self,state,action,single_value=False):
         if single_value:
             coords,feats = ME.utils.sparse_collate([state[0]],[state[1]])
-            jnt_err = torch.tensor(state[2],device='cuda',dtype=torch.float32)
-            jnt_err = jnt_err.view(1, jnt_err.shape[0])
+            jnt_err = state[2].clone().detach().view(1,state[2].shape[0]).cuda().float()
+            # torch.tensor(state[2],device='cuda',dtype=torch.float32).view(1,state[2].shape[0])
         else: 
             coords,feats = ME.utils.sparse_collate(state[0],state[1])
-            jnt_err = torch.tensor(state[2],device='cuda',dtype=torch.float32)
-        x = ME.SparseTensor(coordinates=coords, features=feats, device='cuda')
-        action = action.cuda()
-        x = self.conv1(x)
-        x = self.conv2(x)
-        x = self.conv3(x)
-        x = self.conv4(x)
-        x = self.pooling(x)
-        x = self.to_dense_tnsr(x)
-        y = torch.concat((x,jnt_err,action),dim=1)
-        x = self.linear(y)
-        x = self.out(x)
-        return x
+            jnt_err = state[2].clone().detach().cuda().float()
+            # torch.tensor(state[2],device='cuda',dtype=torch.float32)
+
+        x = ME.SparseTensor(coordinates=coords, features=feats,device='cuda')
+        action = action.clone().detach().cuda().float()
+        return x,jnt_err,action
+
+    def forward(self,x,jnt_err,action):
+        x1 = self.conv1(x)
+        x2 = self.conv2(x1)
+        x3 = self.conv3(x2)
+        x4 = self.conv4(x3)
+        x5 = self.pooling(x4)
+        x6 = self.to_dense_tnsr(x5)
+        y = torch.cat((x6,jnt_err,action),dim=1)
+        x7 = self.linear(y)
+        out = self.out(x7)
+        return out
 
     def save_checkpoint(self):
-        print('...saving ' + self.name + '...')
+        # print('...saving ' + self.name + '...')
         torch.save(self.state_dict(), self.file_path)
 
     def load_checkpoint(self):

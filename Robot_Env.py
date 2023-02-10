@@ -146,7 +146,9 @@ class RobotEnv():
         if not isinstance(action,np.ndarray):
             action = action.cpu()
             action = action.detach()
-            vel_err = action.numpy() - self.robot.jnt_vel
+            action = action.numpy()
+        action = action.reshape(3)
+        vel_err = action - self.robot.jnt_vel
         tau, dedt = self.Controller.step(vel_err)
         nxt_vel = (tau-damping*self.robot.jnt_vel)*dt + self.robot.jnt_vel
         self.robot.set_jnt_vel(nxt_vel) 
@@ -171,7 +173,6 @@ class RobotEnv():
 
         reward = -Alpha * np.linalg.norm(self.jnt_err) + bonus
 
-        self.obj.step()
         coords = []
         feats = []
         for obj in self.objs:
@@ -183,7 +184,7 @@ class RobotEnv():
         feats.append(rob_feats)
         coords = torch.vstack(coords)
         feats = torch.vstack(feats)
-        state = (coords,feats,self.jnt_err)
+        state = (coords,feats,torch.tensor(self.jnt_err,device='cuda'))
         return state, reward, done, self.info
 
 
@@ -204,7 +205,7 @@ class RobotEnv():
         coords = torch.vstack(coords)
         feats = torch.vstack(feats)
 
-        state = (coords,feats,self.jnt_err)
+        state = (coords,feats,torch.tensor(self.jnt_err,device='cuda'))
         return state
 
 

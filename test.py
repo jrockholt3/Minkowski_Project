@@ -21,17 +21,19 @@ from collections import OrderedDict
 
 robot = Robot3D.robot_3link()
 obj = rand_object()
-print(robot.body2.cloud.shape)
 robot.set_pose(np.array([0, np.pi/4, -1*np.pi/3]))
 # robot.forward(make_plot=True)
 robot_coords,robot_feat = robot.get_coord_list()
 obj_coords, obj_feat = obj.get_coord_list()
-print(obj_coords.shape)
-# coords = torch.vstack([robot_coords,obj_coords])
-# feats = torch.vstack([robot_feat, obj_feat])
+coords = torch.vstack([robot_coords,obj_coords])
+feats = torch.vstack([robot_feat, obj_feat])
 
-# coords, feats = ME.utils.sparse_collate([coords],[feats])
-# A = ME.SparseTensor(coordinates=coords, features=feats)
+coords, feats = ME.utils.sparse_collate([coords],[feats])
+A = ME.SparseTensor(coordinates=coords, features=feats)
+actor = Actor(1,3,4,'actor')
+actor.eval()
+actor.forward_prep((obj_coords,obj_feat,torch.zeros(3)),single_value=True)
+
 # n = 10
 # t = 0
 # # net.eval()
@@ -116,8 +118,8 @@ print(obj_coords.shape)
 
 # state, action, reward, new_state, done = memory.sample_buffer(128)
 
-env = RobotEnv()
-agent = Agent(env)
+# env = RobotEnv()
+# agent = Agent(env)
 
 
 
