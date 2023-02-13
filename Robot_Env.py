@@ -1,7 +1,7 @@
 import numpy as np
 import Robot3D as Robot
 from math import atan2
-from Object import rand_object
+from Object_v2 import rand_object
 import torch 
 
 # global variables
@@ -176,15 +176,15 @@ class RobotEnv():
         coords = []
         feats = []
         for obj in self.objs:
-            c,f = obj.get_coord_list()
+            c,f = obj.get_coords()
             coords.append(c)
             feats.append(f)
-        rob_coords, rob_feats = self.robot.get_coord_list()
+        rob_coords, rob_feats = self.robot.get_coords()
         coords.append(rob_coords)
         feats.append(rob_feats)
-        coords = torch.vstack(coords)
-        feats = torch.vstack(feats)
-        state = (coords,feats,torch.tensor(self.jnt_err,device='cuda'))
+        coords = np.vstack(coords)
+        feats = np.vstack(feats)
+        state = (coords,feats,self.jnt_err)
         return state, reward, done, self.info
 
 
@@ -196,16 +196,16 @@ class RobotEnv():
         coords = []
         feats = []
         for obj in self.objs:
-            c,f = obj.get_coord_list()
+            c,f = obj.get_coords()
             coords.append(c)
             feats.append(f)
-        rob_coords, rob_feats = self.robot.get_coord_list()
+        rob_coords, rob_feats = self.robot.get_coords()
         coords.append(rob_coords)
         feats.append(rob_feats)
-        coords = torch.vstack(coords)
-        feats = torch.vstack(feats)
+        coords = np.vstack(coords)
+        feats = np.vstack(feats)
 
-        state = (coords,feats,torch.tensor(self.jnt_err,device='cuda'))
+        state = (coords,feats,self.jnt_err)
         return state
 
 

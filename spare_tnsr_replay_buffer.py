@@ -28,11 +28,11 @@ class ReplayBuffer:
         self.new_feat_memory = np.empty(max_size,dtype=np.object)
         self.new_jnt_err_memory = np.empty(self.mem_size,dtype=np.object)
 
-        self.action_memory = torch.zeros((self.mem_size, jnt_d))
-        self.reward_memory = torch.zeros(self.mem_size)
-        self.terminal_memory = torch.zeros(self.mem_size, dtype=torch.bool)
+        self.action_memory = np.zeros((self.mem_size, jnt_d))
+        self.reward_memory = np.zeros(self.mem_size)
+        self.terminal_memory = np.zeros(self.mem_size, dtype=bool)
         self.file = file
-        self.time_step = torch.ones(self.mem_size)*np.inf # variable for sampling buffer
+        self.time_step = np.ones(self.mem_size)*np.inf # variable for sampling buffer
                                         # will need to go back 'x' # of time steps
                                         # to create the 4D space tensor
                                         # set to np.inf so that all entries do not 
@@ -52,7 +52,7 @@ class ReplayBuffer:
         self.new_feat_memory[ndx] = new_state[1]
         self.new_jnt_err_memory[ndx] = new_state[2]
         self.terminal_memory[ndx] = done
-        self.action_memory[ndx] = action
+        self.action_memory[ndx] = action.cpu().numpy()
         self.reward_memory[ndx] = reward
         self.mem_cntr += 1
         # q2 = check_memory()
@@ -90,17 +90,17 @@ class ReplayBuffer:
             
             jnt_err_batch.append(self.jnt_err_memory[b])
             new_jnt_err_batch.append(self.new_jnt_err_memory[b])
-            coord_batch.append(torch.vstack(coord_list))
-            feat_batch.append(torch.vstack(feat_list))
-            new_coord_batch.append(torch.vstack(new_coord_list))
-            new_feat_batch.append(torch.vstack(new_feat_list))
+            coord_batch.append(np.vstack(coord_list))
+            feat_batch.append(np.vstack(feat_list))
+            new_coord_batch.append(np.vstack(new_coord_list))
+            new_feat_batch.append(np.vstack(new_feat_list))
             feat_list = []
             coord_list = []
             new_coord_list = []
             new_feat_list = []
 
-        jnt_err = torch.vstack(jnt_err_batch)
-        new_jnt_err = torch.vstack(new_jnt_err_batch)
+        jnt_err = np.vstack(jnt_err_batch)
+        new_jnt_err = np.vstack(new_jnt_err_batch)
         actions = self.action_memory[batch]
         rewards = self.reward_memory[batch]
         dones = self.terminal_memory[batch]

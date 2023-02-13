@@ -1,30 +1,39 @@
 import numpy as np
 from Robot_Env import RobotEnv
 from Robot3D import robot_3link
-import matplotlib.pyplot as plt
-from mpl_toolkits import mplot3d
+from time import time 
+# import matplotlib.pyplot as plt
+# from mpl_toolkits import mplot3d
 
-robot = robot_3link()
-bad_count = 0
-bad_list = []
-for i in range(1000):
-    vec = (2*np.random.rand(3) - 1)
-    mag = .4*np.random.rand() + .2
-    goal = mag * .999 * (vec/np.linalg.norm(vec)) + np.array([0,0,.3])
-    th = robot.reverse(goal=goal)
-    if np.isnan(th[1,0]):
-        bad_list.append(goal)
-        bad_count += 1
+from Object_v2 import rand_object as Obj
+from Object_v2 import Cylinder as Cyl
 
-print('bad_count', bad_count)
-if bad_count > 0:
-    bad_arr = np.vstack(bad_list)
-    xx = bad_arr[:,0]
-    yy = bad_arr[:,1]
-    zz = bad_arr[:,2]
-    fig = plt.figure
-    ax = plt.axes(projection='3d')
-    ax.scatter3D(xx,yy,zz,alpha=.5)
-    plt.show()
+obj = Obj()
+cyl = Cyl()
 
-robot.reverse(goal=goal,make_plot=True)
+def c(th): return np.cos(th)
+def s(th): return np.sin(th)
+th = np.pi/2
+Ty = np.array([[ c(th), 0.0, s(th), 0.0],
+              [  0.0,  1.0,   0.0, 0.0],
+              [-s(th), 0.0, c(th), 0.0],
+              [   0.0, 0.0,   0.0, 1.0]])
+Tx = np.array([[1.0,   0.0,  0.0, 0.0],
+               [0.0, c(th),-s(th), 0.0],
+               [0.0, s(th), c(th), 0.0],
+               [0.0,   0.0,   0.0, 1.0]])
+
+# vec = np.array([0.0,0.0,1.0,1.0])
+
+# print(homo_trans(Tx,vec))
+
+t = 0
+n = 1000
+for i in range(n):
+    t1 = time()
+    obj.get_coords()
+    cyl.get_coords(0.0,Ty)
+    t += time() - t1
+
+print('numba freq', n/t)
+

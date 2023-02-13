@@ -7,8 +7,7 @@ import numpy as np
 import math as m
 # import matplotlib.pyplot as plt
 # from mpl_toolkits import mplot3d
-from helpers import quantize
-from Object import Cylinder
+from Object_v2 import Cylinder, rand_object
 
 # Goal is to create a joint space that the robot can operate in. As long as a decision doesn't put it out of this joint space it can go there. This could be constrain by the orientation of the part.   
 
@@ -85,9 +84,7 @@ class robot_3link():
         self.jnt_vel = np.array([0.0, 0.0, 0.0])
         self.traj = np.array([])
         self.label = label
-        self.body2 = Cylinder()
-        self.body3 = Cylinder()
-#        self.th_lim = np.array()
+        self.body = Cylinder()
 
     def set_pose(self, th_arr):
         c = np.cos(th_arr)
@@ -280,20 +277,23 @@ class robot_3link():
         ax.axes.set_zlim3d(bottom=0, top=workspace+self.S[0]) 
         plt.show()
 
-    def get_coord_list(self,t=0):
+    def get_coords(self,t=0):
         T_dict = self.get_transform()
         T2 = T_dict['2toF']
         T3 = T_dict['3toF']
         th = np.pi/2
-        T = np.array([[np.cos(th), 0, np.sin(th), 0],
-                      [0, 1, 0, 0],
-                      [-np.sin(th), 0, np.cos(th), 0],
-                      [0, 0, 0, 1]])
+        Ty = np.array([[np.cos(th), 0.0, np.sin(th), 0.0],
+                      [0.0, 1.0, 0.0, 0.0],
+                      [-np.sin(th), 0.0, np.cos(th), 0.0],
+                      [0.0, 0.0, 0.0, 1.0]])
 
-        coord_list2,feat2 = self.body2.get_coord_list(0,T2@T)
-        coord_list3,feat3 = self.body3.get_coord_list(0,T3@T)
+        T = T2@Ty
+        original = self.body.original
+        coords2,feat2 = self.body.get_coords(t, T)
+        T = T3@Ty
+        coords3,feat3 = self.body.get_coords(t, T)
 
-        return torch.vstack([coord_list2, coord_list3]), torch.vstack([feat2, feat3])
+        return np.vstack((coords2,coords3)), np.vstack((feat2, feat3))
 
 
 

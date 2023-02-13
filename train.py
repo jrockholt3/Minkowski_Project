@@ -30,18 +30,19 @@ if load_check_ptn:
 
 score_history = []
 for i in range(episodes):
+    t1 = time()
     with torch.no_grad():
         state = env.reset()
         n = 0
         done = False
         score = 0
-        t1 = time()
         while not done:
             action = agent.choose_action(state)
             new_state, reward, done, info = env.step(action)
             agent.remember(state, action, reward, new_state,done,n)
             score += reward
             state = new_state
+            n += 1 
 
         score_history.append(score)
         if np.mean(score_history[-n:]) > best_score:
@@ -49,15 +50,14 @@ for i in range(episodes):
             agent.save_models()
             best_score = np.mean(score_history[-n:])
 
-    print('episode', i, 'score_avg %.2f' %np.mean(score_history[-n:]), 'time %.2f' %(time()-t1))
+    print('episode', i, 'score_avg %.2f' %np.mean(score_history[-n:])) #, 'time %.2f' %(time()-t1))
 
+    
     for j in range(n_batch):
         agent.learn()
+    print('total time', time()-t1)
 
-    torch.cuda.memory_summary(abbreviated=False)
-    torch.cuda.empty_cache()
-    gc.collect()
-    print('episode',i,'added',check_memory())
+
     # print('memory allocated 0: %f' %(torch.cuda.memory_allocated(0)))
     # GPUtil.showUtilization()
 

@@ -82,11 +82,11 @@ class Actor(ME.MinkowskiNetwork):
     def preprocessing(self,state,single_value=False):
         if single_value:
             coords,feats = ME.utils.sparse_collate([state[0]],[state[1]])
-            jnt_err = state[2].float().view(1,state[2].shape[0])
+            jnt_err = torch.tensor(state[2],dtype=coords.dtype,device='cuda').view(1,state[2].shape[0])
             # torch.tensor(state[2],device='cuda',dtype=torch.float32).view(1,state[2].shape[0])
         else: 
             coords,feats = ME.utils.sparse_collate(state[0],state[1])
-            jnt_err = state[2].float()
+            jnt_err = torch.tensor(state[2],dtype=coords.dtype,device='cuda')
             # torch.tensor(state[2],device='cuda',dtype=torch.float32)
 
         x = ME.SparseTensor(coordinates=coords, features=feats,device='cuda')
@@ -185,16 +185,17 @@ class Critic(ME.MinkowskiNetwork):
     def preprocessing(self,state,action,single_value=False):
         if single_value:
             coords,feats = ME.utils.sparse_collate([state[0]],[state[1]])
-            jnt_err = state[2].clone().detach().view(1,state[2].shape[0]).cuda().float()
+            jnt_err = torch.tensor(state[2],dtype=coords.dtype,device='cuda').view(1,state[2].shape[0])
             # torch.tensor(state[2],device='cuda',dtype=torch.float32).view(1,state[2].shape[0])
         else: 
             coords,feats = ME.utils.sparse_collate(state[0],state[1])
-            jnt_err = state[2].clone().detach().cuda().float()
+            jnt_err = torch.tensor(state[2],dtype=coords.dtype,device='cuda')
             # torch.tensor(state[2],device='cuda',dtype=torch.float32)
 
         x = ME.SparseTensor(coordinates=coords, features=feats,device='cuda')
-        action = action.clone().detach().cuda().float()
+        action = torch.tensor(action,dtype=coords.dtype,device='cuda')
         return x,jnt_err,action
+        
 
     def forward(self,x,jnt_err,action):
         x1 = self.conv1(x)
