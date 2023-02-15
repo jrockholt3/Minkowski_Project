@@ -5,7 +5,7 @@ from Object_v2 import rand_object
 # import torch 
 
 # global variables
-dt = 0.02 # time step
+dt = 0.016 # time step
 t_limit = 5 # time limit in seconds
 thres = np.array([.03, .03, .03]) # joint error threshold
 vel_thres = thres # joint velocity error threshold for stopping
@@ -117,13 +117,17 @@ class observation_space():
 
 class RobotEnv():
     # have to generate random poses
-    def __init__(self, eval=False):
+    def __init__(self, eval=False, has_objects=True):
         self.robot = Robot.robot_3link()
-        self.objs = [rand_object(), rand_object(), rand_object()]
+        if has_objects:
+            self.objs = [rand_object(dt=dt), rand_object(dt=dt), rand_object(dt=dt)]
+        else:
+            self.objs = [] 
+
         self.action_space = action_space()
         self.observation_space = observation_space()
         self.reward_range = [0, -np.inf]
-        self.Controller = PDControl()
+        self.Controller = PDControl(dt=dt)
         self.eval = eval
 
         # setting runtime variables 
@@ -137,6 +141,7 @@ class RobotEnv():
         self.done = False
         self.jerk_sum = 0
         self.t_sum = 0
+        self.t_count = 0
         # self.jnt_err_sum = 0
         self.info = {}
         self.jnt_err = calc_jnt_err(self.robot.pos, self.goal) 
@@ -147,6 +152,7 @@ class RobotEnv():
     # need to return the relative positions of the object and the relative vels
     # in terms of the end effector frame of reference.
     def step(self, action, use_PID=False):
+        self.t_count += 1
         paused = False
         for o in self.objs:
             prox = self.robot.proximity(o)
@@ -162,15 +168,12 @@ class RobotEnv():
                     action = action.detach()
                     action = action.numpy()
                 action = action.reshape(3)
-                vel_err = action - self.robot.jnt_vel
-                tau, dedt = self.Controller.step(vel_err)
-            
-            # print('tau is ', tau)
+                tau = action
+
             nxt_vel = (tau-damping*self.robot.jnt_vel)*dt + self.robot.jnt_vel
             self.robot.set_jnt_vel(nxt_vel) 
             nxt_pos = angle_calc(dt * self.robot.jnt_vel + self.robot.pos)
             self.robot.set_pose(nxt_pos) # set next pose
-            # print('robot pos ', self.robot.pos)
             jnt_err = calc_jnt_err(self.robot.pos, self.goal)
 
             self.jnt_err_vel = (self.jnt_err - jnt_err)/dt
@@ -202,13 +205,13 @@ class RobotEnv():
         coords = []
         feats = []
         if not self.eval: # skip over computation when making an animation
-            for obj in self.objs:
-                c,f = obj.get_coords()
-                coords.append(c)
-                feats.append(f)
-            rob_coords, rob_feats = self.robot.get_coords()
+            rob_coords, rob_feats = self.robot.get_coords(self.t_count)
             coords.append(rob_coords)
             feats.append(rob_feats)
+            for obj in self.objs:
+                c,f = obj.get_coords(self.t_count)
+                coords.append(c)
+                feats.append(f)
             coords = np.vstack(coords)
             feats = np.vstack(feats)
         state = (coords,feats,self.jnt_err)
@@ -223,10 +226,10 @@ class RobotEnv():
         coords = []
         feats = []
         for obj in self.objs:
-            c,f = obj.get_coords()
+            c,f = obj.get_coords(self.t_count)
             coords.append(c)
             feats.append(f)
-        rob_coords, rob_feats = self.robot.get_coords()
+        rob_coords, rob_feats = self.robot.get_coords(t=self.t_count)
         coords.append(rob_coords)
         feats.append(rob_feats)
         coords = np.vstack(coords)

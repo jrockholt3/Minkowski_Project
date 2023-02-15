@@ -137,8 +137,8 @@ class rand_object():
             
         return np.array([x,y])
 
-    def get_coords(self):
-        coords, feats = obj_get_coords(self.curr_pos, self.t, self.radius, self.workspace_limits, self.res)
+    def get_coords(self, t):
+        coords, feats = obj_get_coords(self.curr_pos, t, self.radius, self.workspace_limits, self.res)
         return coords.astype(np.int16), feats.astype(np.float32)
 
     def step(self, time_step=None):

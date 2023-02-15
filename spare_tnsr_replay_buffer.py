@@ -14,7 +14,7 @@ def check_memory():
     return q 
 
 class ReplayBuffer:
-    def __init__(self, max_size, jnt_d, time_d, file='replay_buffer'):
+    def __init__(self, max_size, jnt_d, time_d, file='replay_buffer_no_obj',dir='buffer'):
         # jnt_d = joint dimensions
         self.mem_size = max_size
         self.mem_cntr = 0
@@ -31,7 +31,7 @@ class ReplayBuffer:
         self.action_memory = np.zeros((self.mem_size, jnt_d))
         self.reward_memory = np.zeros(self.mem_size)
         self.terminal_memory = np.zeros(self.mem_size, dtype=bool)
-        self.file = file
+        self.file = dir + '/' + file
         self.time_step = np.ones(self.mem_size)*np.inf # variable for sampling buffer
                                         # will need to go back 'x' # of time steps
                                         # to create the 4D space tensor
@@ -113,7 +113,6 @@ class ReplayBuffer:
         file_str = self.file + '.pkl'
         with open(file_str, 'wb') as file:
             pickle.dump(self,file)
-        print('buffer saved')
 
     def load(self):
         print('loading buffer')
@@ -121,16 +120,17 @@ class ReplayBuffer:
         with open(file_str, 'rb') as file:
             new_buff = pickle.load(file)
 
-        # coord_memory, feat_memory, and jnt_err all define the state 
-        self.coord_memory = new_buff.coord_memory
-        self.feat_memory = new_buff.feat_memory
-        self.jnt_err_memory = new_buff.jnt_err_memory
+        return new_buff
+        # # coord_memory, feat_memory, and jnt_err all define the state 
+        # self.coord_memory = new_buff.coord_memory
+        # self.feat_memory = new_buff.feat_memory
+        # self.jnt_err_memory = new_buff.jnt_err_memory
 
-        self.new_coord_memory = new_buff.new_coord_memory
-        self.new_feat_memory = new_buff.new_feat_memory
-        self.new_jnt_err_memory = new_buff.new_jnt_err_memory
+        # self.new_coord_memory = new_buff.new_coord_memory
+        # self.new_feat_memory = new_buff.new_feat_memory
+        # self.new_jnt_err_memory = new_buff.new_jnt_err_memory
 
-        self.action_memory = new_buff.action_memory
-        self.reward_memory = new_buff.reward_memory
-        self.terminal_memory = new_buff.terminal_memory
-        self.time_step = new_buff.time_step 
+        # self.action_memory = new_buff.action_memory
+        # self.reward_memory = new_buff.reward_memory
+        # self.terminal_memory = new_buff.terminal_memory
+        # self.time_step = new_buff.time_step 

@@ -6,7 +6,7 @@ import numpy as np
 import MinkowskiEngine as ME
 from spare_tnsr_replay_buffer import ReplayBuffer
 from Networks import Actor, Critic
-import Robot_Env
+# import Robot_Env
 import pickle
 import gc 
 
@@ -31,8 +31,8 @@ class Agent():
         self.noise = noise
         self.e = e
         self.enoise = enoise
-        self.max_action = env.action_space.high
-        self.min_action = env.action_space.low
+        self.max_action = torch.tensor(env.action_space.high, device='cuda')
+        self.min_action = torch.tensor(env.action_space.low, device='cuda')
         self.tau = tau
         self.score_avg = 0
         self.best_score = 0
@@ -61,7 +61,6 @@ class Agent():
             action += torch.normal(torch.zeros_like(action),std=noise)
 
         action = torch.clip(action,self.min_action, self.max_action)
-        del x,jnt_err,state
         return action
 
     def update_network_params(self, tau=None):
@@ -142,6 +141,7 @@ class Agent():
         self.actor.optimizer.step()
 
         self.update_network_params()
+        return critic_loss.item()
 
     def save_models(self):
         self.actor.save_checkpoint()
@@ -154,6 +154,9 @@ class Agent():
         self.critic.load_checkpoint()
         self.target_actor.load_checkpoint()
         self.target_critic.load_checkpoint()
+
+    def load_memory(self):
+        self.memory = self.memory.load()
 
 
         

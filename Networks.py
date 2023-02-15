@@ -3,7 +3,7 @@ import torch.nn as nn
 from torch.optim import NAdam
 import MinkowskiEngine as ME
 import numpy as np
-from Object import rand_object, Cylinder
+# from Object_v2 import rand_object, Cylinder
 import torch
 from time import time 
 from spare_tnsr_replay_buffer import ReplayBuffer
@@ -14,15 +14,15 @@ class Actor(ME.MinkowskiNetwork):
         super(Actor, self).__init__(D)
         self.name = name 
         self.file_path = os.path.join(chckpt_dir,name+'_ddpg')
-        conv_out1 = 64
-        conv_out2 = 256
-        conv_out3 = 256
-        conv_out4 = 1024
+        conv_out1 = 32
+        conv_out2 = 128
+        conv_out3 = 128
+        conv_out4 = 128
         layer1_unit = 512
         self.conv1 = nn.Sequential(
             ME.MinkowskiConvolution(in_channels=in_feat,
                 out_channels=conv_out1,
-                kernel_size=6,
+                kernel_size=3,
                 stride=3,
                 bias=False,
                 dimension=D),
@@ -32,8 +32,8 @@ class Actor(ME.MinkowskiNetwork):
         self.conv2 = nn.Sequential(
             ME.MinkowskiConvolution(in_channels=conv_out1,
                 out_channels=conv_out2,
-                kernel_size=4,
-                stride=4,
+                kernel_size=2,
+                stride=2,
                 bias=False,
                 dimension=D),
             ME.MinkowskiBatchNorm(conv_out2),
@@ -42,8 +42,8 @@ class Actor(ME.MinkowskiNetwork):
         self.conv3 = nn.Sequential(
             ME.MinkowskiConvolution(in_channels=conv_out2,
                 out_channels=conv_out3,
-                kernel_size=4,
-                stride=2,
+                kernel_size=(1,4,4,4),
+                stride=(0,4,4,4),
                 bias=False,
                 dimension=D),
             ME.MinkowskiBatchNorm(conv_out3),
@@ -52,11 +52,11 @@ class Actor(ME.MinkowskiNetwork):
         self.conv4 = nn.Sequential(
             ME.MinkowskiConvolution(in_channels=conv_out3,
                 out_channels=conv_out4,
-                kernel_size=2,
-                stride=2,
+                kernel_size=(1,5,5,4),
+                stride=(0,5,5,4),
                 bias=False,
                 dimension=D),
-            ME.MinkowskiBatchNorm(conv_out4),
+            # ME.MinkowskiBatchNorm(conv_out4),
             ME.MinkowskiSELU()
         )
         self.pooling = ME.MinkowskiGlobalMaxPooling()
@@ -79,6 +79,11 @@ class Actor(ME.MinkowskiNetwork):
             y[int(c[0])] = x.features[int(c[0])]
         return y
 
+    def to_3D(self, x:ME.SparseTensor):
+        new_coords = torch.cat((torch.reshape(x.coordinates[:,0],(x.coordinates.shape[0],1)),x.coordinates[:,2:5]),dim=1)
+        y = ME.SparseTensor(features=x.features,coordinates=new_coords,device='cuda')
+        return y
+
     def preprocessing(self,state,single_value=False):
         if single_value:
             coords,feats = ME.utils.sparse_collate([state[0]],[state[1]])
@@ -92,17 +97,22 @@ class Actor(ME.MinkowskiNetwork):
         x = ME.SparseTensor(coordinates=coords, features=feats,device='cuda')
         return x,jnt_err
 
-    def forward(self,x,jnt_err):
+    def forward(self,x:ME.SparseTensor,jnt_err):
+        print('input',x.features.shape)
         x = self.conv1(x)
-        x = self.conv2(x)
-        x = self.conv3(x)
-        x = self.conv4(x)
-        x = self.pooling(x)
-        x = self.to_dense_tnsr(x)
-        x = torch.cat((x,jnt_err.cuda()),dim=1)
-        x = self.linear(x)
-        x = self.out(x)
-        return x
+        print('conv1', x.features.shape)
+        x2 = self.conv2(x)
+        print('conv2', x2.features.shape)
+        y = self.conv3(x2)
+        print('conv3',y.features.shape)
+        y = self.conv4(y)
+        print('conv4',y.features.shape)
+        # x = self.pooling(x)
+        # x = self.to_dense_tnsr(x)
+        # x = torch.cat((x,jnt_err.cuda()),dim=1)
+        # x = self.linear(x)
+        # x = self.out(x)
+        return y
 
     def save_checkpoint(self):
         # print('...saving ' + self.name + '...')
@@ -146,7 +156,7 @@ class Critic(ME.MinkowskiNetwork):
         self.conv3 = nn.Sequential(
             ME.MinkowskiConvolution(in_channels=conv_out2,
                 out_channels=conv_out3,
-                kernel_size=4,
+                kernel_size=(0,4,4,5),
                 stride=2,
                 bias=False,
                 dimension=D),
@@ -217,52 +227,21 @@ class Critic(ME.MinkowskiNetwork):
         print('...loading ' + self.name + '...')
         self.load_state_dict(torch.load(self.file_path))
 
-# memory = ReplayBuffer(int(1e3),3,6)
-# jnt_err = torch.zeros(3)
-# action = torch.zeros(3)
-# reward = 0
 
-# i = 0
-# while i < 200:
-#     obj = rand_object()
-#     done = False
-#     n = 0
-#     while not done:
-#         n += 1
-#         coords, feats = obj.get_coord_list()
-#         state = (coords, feats, jnt_err, obj.t)
-#         obj.step()
-#         coords2, feats2 = obj.get_coord_list()
-#         new_state = (coords2, feats2, jnt_err, obj.t)
 
-#         if obj.t*obj.dt >= obj.tf:
-#             done = True
-#             # print('broke on episode end')
-#         elif n > 1000:
-#             print('broke on over-run')
-#             done = True
-#         else:
-#             done = False
+input = torch.ones((1,1,6,120,120,90))
+x = ME.to_sparse(input,device='cuda',format='BCXXXX')
 
-#         if coords.size == 0 or coords2.size == 0:
-#             print('empty array stored')
-#         memory.store_transition(state, action, reward, new_state, done)
-#         i = i + 1
 
-# state, action, reward, new_state, done = memory.sample_buffer(128)
-# coords = state[0]
-# feats = state[1]
+actor = Actor(1,3,D=4,name='actor')
+y = actor.to_3D(x)
+print(y.coordinates.size())
+print(x.coordinates.size())
 
-# # coord_list = torch.IntTensor(coord_list)
-# # feat_list = torch.FloatTensor(feat_list)
-# # coords = np.vstack([out1,out2,out3,out4,out5,out6,out7,out8])
-# # feats = np.vstack([feat1,feat2,feat3,feat4,feat5,feat6,feat7,feat8])
-# coords,feats = ME.utils.sparse_collate([coords],[feats])
+y = actor.forward(x,torch.ones((1,3),device='cuda'))
 
-# input = ME.SparseTensor(feats,coords)
-# input.float()
-# # print(input.dtype)
-# net = Critic(1, D=4)
-# out = net.forward(input)
-# print(input.coordinates)
-# print(out.coordinates)
+# print(torch.sum(y.coordinates[:,0] - x2.coordinates[:,0]))
+# print(torch.sum(y.coordinates[:,1] - x2.coordinates[:,2]))
+# print(torch.sum(y.coordinates[:,2] - x2.coordinates[:,3]))
+# print(torch.sum(y.coordinates[:,3] - x2.coordinates[:,4]))
+

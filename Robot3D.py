@@ -5,9 +5,9 @@
 # import torch 
 import numpy as np
 import math as m
-import matplotlib.pyplot as plt
-from mpl_toolkits import mplot3d
-from Object_v2 import Cylinder, rand_object
+# import matplotlib.pyplot as plt
+# from mpl_toolkits import mplot3d
+from Object_v2 import Cylinder
 
 # Goal is to create a joint space that the robot can operate in. As long as a decision doesn't put it out of this joint space it can go there. This could be constrain by the orientation of the part.   
 
@@ -285,7 +285,7 @@ class robot_3link():
                 ax.scatter3D(x,y,z)
         plt.show()
 
-    def get_coords(self,t=0):
+    def get_coords(self,t):
         T_dict = self.get_transform()
         T2 = T_dict['2toF']
         T3 = T_dict['3toF']
@@ -304,42 +304,4 @@ class robot_3link():
         return np.vstack((coords2,coords3)), np.vstack((feat2, feat3))
 
 
-
-
-
-
-class defined_object():
-    def __init__(self, start, goal, vel, object_radius=.03):
-        self.radius = object_radius
-        # init the object's location at a random (x,y) within the workspace
-        self.start = start
-        self.goal = goal
-        v_vec = (self.goal - self.start) / np.linalg.norm((self.goal - self.start))
-        self.vel = vel*v_vec
-        self.tf = np.sqrt((self.goal[0]-self.start[0])**2 + (self.goal[1]-self.start[1])**2) / np.linalg.norm(self.vel)
-        self.curr_pos = self.start
-        
-    def set_pos(self, pos):
-        self.curr_pos = pos
-        
-    def path(self, t, set_new_pos=False):
-        goal = self.goal
-        start = self.start
-        tf = self.tf
-        
-        if t < tf:
-            x = t*(goal[0]-start[0])/tf + start[0]
-            y = t*(goal[1]-start[1])/tf + start[1]
-        else:
-            x = goal[0]
-            y = goal[1]
-            
-        if set_new_pos == True:
-            self.set_pos(np.array([x,y]))
-            
-        return np.array([x,y])
-    
-    def contact_point(self, object_pos):
-        return -1*approach_vec*self.radius
-        
 
