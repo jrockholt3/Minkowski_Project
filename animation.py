@@ -1,15 +1,20 @@
+import platform
+import matplotlib
+# matplotlib.use('nbAgg'
+# print(platform.system())
+
 import numpy as np
 import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 import mpl_toolkits.mplot3d.axes3d as p3
 import matplotlib.animation as animation
 import Robot_Env
 from Robot_Env import dt
-from Object import rand_object
+from Object_v2 import rand_object
 from Robot3D import workspace_limits as lims 
 # Fixing random state for reproducibility
 
-
-show_box = True
+show_box = False
 
 class Box():
     def __init__(self):
@@ -40,16 +45,21 @@ def gen_centers(x,y,z):
     
     return np.vstack(centers)
 
-# Attaching 3D axis to the figure
+
+# init figure
 fig = plt.figure()
-ax = p3.Axes3D(fig)
+# ax = Axes3D(fig)
+ax = fig.add_subplot(111, projection='3d')
 
 # Fifty lines of random 3-D lines
-env = Robot_Env.RobotEnv()
+env = Robot_Env.RobotEnv(eval=True)
+# env.start = np.array([0, np.pi/4, -np.pi/4])
+# env.goal = np.array([-3*np.pi/4, np.pi/12, -np.pi/6])
 goal = env.goal
-env.goal = np.array([-3*np.pi/4, goal[1], goal[2]])
 obj = rand_object()
 obj.dt = Robot_Env.dt
+env.objs = [obj]
+# env.robot.set_pose(env.start)
 box = Box()
 
 x_arr = []
@@ -72,17 +82,16 @@ y_box = []
 z_box = []
 done = False
 while not done:
-    _,th,done = env.step()
-    temp = env.robot.forward(th=th)
+    state, reward, done, info = env.step(np.array([0,0,0]), use_PID=True)
+    temp = env.robot.forward()
     x_arr.append(temp[0,:])
     y_arr.append(temp[1,:])
     z_arr.append(temp[2,:])
     centers = gen_centers(temp[0,1:],temp[1,1:],temp[2,1:])
-    temp = obj.curr_pos
+    temp = env.objs[0].curr_pos
     x_arr2.append(temp[0])
     y_arr2.append(temp[1])
     z_arr2.append(temp[2])
-    obj.step()
 
     x_box.append(np.hstack([centers[:,0],temp[0]]))
     y_box.append(np.hstack([centers[:,1],temp[1]]))
@@ -239,5 +248,7 @@ else:
 
 ani = animation.FuncAnimation(
     fig, update, N, interval=speed, blit=False)
+
+# ani.save('file.gif')
 
 plt.show()

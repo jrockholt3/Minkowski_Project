@@ -2,11 +2,11 @@
 # coding: utf-8
 
 # In[1]:
-import torch 
+# import torch 
 import numpy as np
 import math as m
-# import matplotlib.pyplot as plt
-# from mpl_toolkits import mplot3d
+import matplotlib.pyplot as plt
+from mpl_toolkits import mplot3d
 from Object_v2 import Cylinder, rand_object
 
 # Goal is to create a joint space that the robot can operate in. As long as a decision doesn't put it out of this joint space it can go there. This could be constrain by the orientation of the part.   
@@ -102,7 +102,7 @@ class robot_3link():
         T_dict = self.get_transform(self.pos)
         keys = T_dict.keys()
         obj_pos = scene_obj.curr_pos # need to change later to reflect an object's volume
-        vec = np.array([obj_pos[0],obj_pos[1],0,1])
+        vec = np.array([obj_pos[0],obj_pos[1],obj_pos[2],1])
         temp = np.ones((4,3))
         for i,k in enumerate(keys):
             T = T_dict[k]
@@ -110,26 +110,26 @@ class robot_3link():
             vec_T = T@vec # pos of object in frame pov
             temp[:,i] = vec_T # gives the relative position of the vector
         
-        w = self.jnt_vel
-        th = self.pos
-        vp_f = np.array([scene_obj.vel[0], scene_obj.vel[1],0])
+        # w = self.jnt_vel
+        # th = self.pos
+        # vp_f = np.array([scene_obj.vel[0], scene_obj.vel[1],0])
         
         return temp
     
     def proximity(self, scene_obj):
         obj_asb_bodies = self.asb_bodyframe(scene_obj)
-        prox_arr = np.zeros((len(self.links)))
+        prox_arr = np.zeros((len(self.links)-1))
         # body 1
-        for i in range(len(self.links)):
+        for i in range(1,len(self.links)):
             obj_pos = obj_asb_bodies[0:3,i]
             if obj_pos[0] <= 0: # if obj is behind ith joint
                 prox1 = np.linalg.norm(obj_pos)
-            elif obj_pos[0] >= self.links[0]: # if obj is past the jth joint
-                prox1 = np.linalg.norm(obj_pos)
+            elif obj_pos[0] >= self.links[i]: # if obj is past the jth joint
+                prox1 = np.linalg.norm(obj_pos - np.array([self.links[i],0,0]))
             else:
-                prox1 = abs(obj_pos[1])
+                prox1 = np.linalg.norm(obj_pos[1:]) # norm distance from arm
                 
-            prox_arr[i] = prox1
+            prox_arr[i-1] = prox1
             
         return prox_arr
 
@@ -157,7 +157,7 @@ class robot_3link():
         
         return np.array(vp_j2).T
     
-    def forward(self, th=None, make_plot=False):
+    def forward(self, th=None, make_plot=False, with_obj=False, obj=None):
         if np.any(th==None): th = self.pos
         l = self.links
         a = self.aph
@@ -167,7 +167,11 @@ class robot_3link():
                          T_1F(th[0],self.S[0])@T_ji(th[1],a[0],l[0],S[1])@T_ji(th[2],a[1],l[1],S[2])@np.array([0,0,0,1]),
                          T_1F(th[0],self.S[0])@T_ji(th[1],a[0],l[0],S[1])@T_ji(th[2],a[1],l[1],S[2])@self.P_3))
         if make_plot == True:
-            self.plot_pose(arr=temp)
+            if not with_obj:
+                self.plot_pose(arr=temp)
+            else:
+                self.plot_pose(arr=temp,with_obj=True,obj=obj)
+        
         return temp.T
 
     def state(self, obj):
@@ -258,7 +262,7 @@ class robot_3link():
             
         return th
     
-    def plot_pose(self, th=None, arr = None):
+    def plot_pose(self, th=None, arr = None, with_obj=False, obj=None):
         if np.any(th==None) and np.any(arr==None): 
             th = self.pos
             arr = self.forward(th=th)
@@ -275,6 +279,10 @@ class robot_3link():
         ax.axes.set_xlim3d(left=-workspace, right=workspace) 
         ax.axes.set_ylim3d(bottom=-workspace, top=workspace) 
         ax.axes.set_zlim3d(bottom=0, top=workspace+self.S[0]) 
+        if with_obj:
+            for o in obj:
+                x,y,z = o.curr_pos[0],o.curr_pos[1],o.curr_pos[2]
+                ax.scatter3D(x,y,z)
         plt.show()
 
     def get_coords(self,t=0):

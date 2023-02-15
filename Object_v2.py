@@ -5,6 +5,8 @@ from numba.experimental import jitclass
 import math as m
 import numpy as np
 
+rng = np.random.default_rng()
+
 @njit(float64[:](float64[:],int32,float64[:]))
 def rnd_arr(arr, decimal,out):
     return np.round_(arr, decimal, out)
@@ -99,13 +101,15 @@ class rand_object():
 
         # init the object's location at a random (x,y) within the workspace
         self.workspace_limits = workspace_limits
-        rho = np.random.rand() * self.workspace_limits[0,1]        
-        phi = 2*m.pi*np.random.rand()
-        phi2 = (m.pi)*np.random.rand() - m.pi/2
-        z_range = np.sum(np.abs(workspace_limits[2,:])) * .7
+        rho = rng.uniform(.5,1.0) * self.workspace_limits[0,1]        
+        phi = 2*np.pi*rng.random()
+        temp = np.array([-1.0, 1.0])
+        phi2 = rng.choice(temp) * np.pi/2 * rng.uniform(0.5, 1.0)
+        # phi2 = np.sign(np.random.rand - 0.5) * (np.pi/4)*np.random.rand() + np.pi/4
+        z_max = np.sum(np.abs(workspace_limits[2,:])) * .7
         z_min = np.abs(workspace_limits[2,0])
-        self.start = np.array([rho*m.cos(phi), rho*m.sin(phi), np.random.rand()*z_range - z_min])
-        self.goal = np.array([rho*m.cos(phi+phi2), rho*m.sin(phi+phi2), np.random.rand()*z_range - z_min])
+        self.start = np.array([rho*m.cos(phi), rho*m.sin(phi), rng.uniform(z_min, z_max)])
+        self.goal = np.array([rho*m.cos(phi+phi2), rho*m.sin(phi+phi2), rng.uniform(z_min, z_max)])
         v_vec = (self.goal - self.start) / np.linalg.norm((self.goal - self.start))
         self.vel = (.5*np.random.rand()+.5)*max_obj_vel*v_vec
         self.tf = np.linalg.norm(self.goal - self.start) / np.linalg.norm(self.vel)
