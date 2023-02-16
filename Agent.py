@@ -9,6 +9,7 @@ from Networks import Actor, Critic
 # import Robot_Env
 import pickle
 import gc 
+from Robot_Env import tau_max
 
 def check_memory():
     q = 0
@@ -21,9 +22,10 @@ def check_memory():
     return q 
 
 class Agent():
-    def __init__(self, env, alpha=0.001,beat=0.002, 
-                    gamma=.99, n_actions=3, time_d=6, max_size=int(1e6), tau=0.005,
-                    batch_size=64,noise=.01,e=.1,enoise=.3):
+    def __init__(self, env, alpha=0.001,beta=0.002, gamma=.99, n_actions=3, 
+                time_d=6, max_size=int(1e6), tau=0.005,
+                batch_size=64,noise=.01*tau_max,e=.1,enoise=.1*tau_max,
+                top_only=False):
         self.gamma = gamma
         self.memory = ReplayBuffer(max_size,n_actions,time_d)
         self.batch_size = batch_size
@@ -37,10 +39,11 @@ class Agent():
         self.score_avg = 0
         self.best_score = 0
 
-        self.actor = Actor(1,n_actions,4,name='actor')
-        self.critic = Critic(1,1,4,name='critic')
-        self.target_actor = Actor(1,n_actions,4,name='targ_actor')
-        self.target_critic = Critic(1,1,4,name='targ_critic')
+        self.actor = Actor(alpha, 1,n_actions,4,name='actor',top_only=top_only)
+        self.critic = Critic(beta, 1,4,name='critic',top_only=top_only)
+        self.target_actor = Actor(alpha, 1,n_actions,4,
+                                    name='targ_actor',top_only=top_only)
+        self.target_critic = Critic(beta, 1,4,name='targ_critic',top_only=top_only)
         self.critic_criterion = nn.MSELoss()
         self.update_network_params(tau=1) # hard copy
 
@@ -58,7 +61,7 @@ class Agent():
                 noise = self.enoise
             else:
                 noise = self.noise
-            action += torch.normal(torch.zeros_like(action),std=noise)
+            action += torch.normal(torch.zeros_like(action),std=self.noise)
 
         action = torch.clip(action,self.min_action, self.max_action)
         return action

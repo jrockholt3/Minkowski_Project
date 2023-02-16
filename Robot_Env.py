@@ -18,10 +18,10 @@ goal = np.array([np.pi/2, np.pi/2, np.pi/2])
 min_prox = 0.15
 
 # Controller gains
-tau_max =  30 #J*rad/s^2, J = 1
+tau_max =  10 #J*rad/s^2, J = 1
 damping = tau_max*.5
-P = 10
-D = 50
+P = 10.0
+D = 5
 
 jnt_vel_max = np.pi/1.5 # rad/s
 

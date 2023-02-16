@@ -1,8 +1,7 @@
 import numpy as np
 import torch
 from Agent import Agent
-from Robot_Env import RobotEnv
-import GPUtil
+from Robot_Env import RobotEnv, tau_max
 import gc 
 from time import time 
 import pickle
@@ -17,17 +16,19 @@ def check_memory():
             pass
     return q 
 
-load_check_ptn = False
+top_only=True
+load_check_ptn = True
 load_memory = False
 has_objs = False
-episodes = 1000
+episodes = 100
 best_score = -np.inf
 n = 5 # number of episodes to calculate the average score
-n_batch = 5
-batch_size = 128 # number of batches to train the networks over per episode
+n_batch = 5 # number of batches to train the networks over per episode
+batch_size = 512 # batch size
 
 env = RobotEnv(has_objects=has_objs)
-agent = Agent(env,batch_size=batch_size)
+agent = Agent(env,batch_size=batch_size,max_size=5000,
+                e=0.0,enoise=0.01*tau_max,top_only=top_only)
 
 if load_check_ptn:
     agent.load_models()
@@ -52,20 +53,20 @@ for i in range(episodes):
             n += 1 
 
         score_history.append(score)
-        if np.mean(score_history[-n:]) > best_score:
+        if np.mean(score_history[-n:]) > best_score and i > 5:
             print('saving models')
             agent.save_models()
             best_score = np.mean(score_history[-n:])
 
-    print('episode', i, 'score_avg %.2f' %np.mean(score_history[-n:])) #, 'time %.2f' %(time()-t1))
-    print(check_memory())
+    
     
     loss = 0
     if agent.memory.mem_cntr > batch_size:
         for j in range(n_batch):
             loss += agent.learn()
         loss_hist.append(loss/n_batch)
-    print('total time', time()-t1)
+    print('episode', i, 'score %.2f' %score, 'score_avg %.2f' %np.mean(score_history[-n:]) \
+            ,'final jnt_err', np.round(env.jnt_err,2), 'time %.2f' %(time()-t1))
 
 file = open('tmp/loss_hist.pkl', 'wb')
 pickle.dump(loss_hist,file)
