@@ -16,19 +16,21 @@ def check_memory():
             pass
     return q 
 
-top_only=True
-load_check_ptn = True
+top_only = True
+transfer = True
+load_check_ptn = False
 load_memory = False
-has_objs = False
-episodes = 100
-best_score = -np.inf
-n = 5 # number of episodes to calculate the average score
+has_objs = True
+episodes = 300
+best_score = -640.0
+n = 10 # number of episodes to calculate the average score
 n_batch = 5 # number of batches to train the networks over per episode
-batch_size = 512 # batch size
+batch_size = 384 # batch size
 
 env = RobotEnv(has_objects=has_objs)
-agent = Agent(env,batch_size=batch_size,max_size=5000,
-                e=0.0,enoise=0.01*tau_max,top_only=top_only)
+agent = Agent(env,batch_size=batch_size,max_size=50000,
+                e=0.0,enoise=0.01*tau_max,top_only=top_only,
+                transfer=transfer)
 
 if load_check_ptn:
     agent.load_models()
@@ -66,7 +68,7 @@ for i in range(episodes):
             loss += agent.learn()
         loss_hist.append(loss/n_batch)
     print('episode', i, 'score %.2f' %score, 'score_avg %.2f' %np.mean(score_history[-n:]) \
-            ,'final jnt_err', np.round(env.jnt_err,2), 'time %.2f' %(time()-t1))
+            ,'final jnt_err', np.round(env.jnt_err,2), 'time %.2f' %(time()-t1), ' mem ', check_memory())
 
 file = open('tmp/loss_hist.pkl', 'wb')
 pickle.dump(loss_hist,file)
@@ -76,3 +78,8 @@ agent.memory.save()
     # print('memory allocated 0: %f' %(torch.cuda.memory_allocated(0)))
     # GPUtil.showUtilization()
 
+# fig = plt.figure()
+# plt.plot(np.arange(len(score_history)), score_history)
+# fig2 = plt.figure()
+# plt.plot(np.arange(len(loss_hist)), loss_hist)
+# plt.show()

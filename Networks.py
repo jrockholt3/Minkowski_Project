@@ -13,7 +13,7 @@ conv_out1 = 32
 conv_out2 = 128
 conv_out3 = 128
 conv_out4 = 512
-linear_out = 512
+linear_out = 1024
 dropout = 0.1
 
 class Actor(ME.MinkowskiNetwork):
@@ -76,10 +76,15 @@ class Actor(ME.MinkowskiNetwork):
             nn.Tanh()
         )
 
+        str_list = ['conv1','conv2','conv3']
         if top_only:
             trainabale_params = []
             for name,p in self.named_parameters():
-                if "conv" not in name:
+                boo = True
+                for str in str_list:
+                    if str in name:
+                        boo = False
+                if boo:
                     trainabale_params.append(p)
             self.optimizer = NAdam(params=trainabale_params, lr=lr)
         else:
@@ -194,10 +199,15 @@ class Critic(ME.MinkowskiNetwork):
             nn.Linear(linear_out,1,bias=True)
         )
 
+        str_list = ['conv1','conv2','conv3']
         if top_only:
             trainabale_params = []
             for name,p in self.named_parameters():
-                if "conv" not in name:
+                boo = True
+                for str in str_list:
+                    if str in name:
+                        boo = False
+                if boo:
                     trainabale_params.append(p)
             self.optimizer = NAdam(params=trainabale_params, lr=lr)
         else:

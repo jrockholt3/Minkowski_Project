@@ -9,6 +9,7 @@ from Networks import Actor, Critic
 # import Robot_Env
 import pickle
 import gc 
+from obj_pred_network import Obj_Pred_Net
 from Robot_Env import tau_max
 
 def check_memory():
@@ -25,7 +26,7 @@ class Agent():
     def __init__(self, env, alpha=0.001,beta=0.002, gamma=.99, n_actions=3, 
                 time_d=6, max_size=int(1e6), tau=0.005,
                 batch_size=64,noise=.01*tau_max,e=.1,enoise=.1*tau_max,
-                top_only=False):
+                top_only=False,transfer=False):
         self.gamma = gamma
         self.memory = ReplayBuffer(max_size,n_actions,time_d)
         self.batch_size = batch_size
@@ -45,6 +46,20 @@ class Agent():
                                     name='targ_actor',top_only=top_only)
         self.target_critic = Critic(beta, 1,4,name='targ_critic',top_only=top_only)
         self.critic_criterion = nn.MSELoss()
+
+        if transfer:
+            temp = Obj_Pred_Net(lr=.001,in_feat=1,D=4)
+            temp.load_checkpoint()
+            self.actor.conv1.load_state_dict(temp.conv1.state_dict())
+            self.actor.conv2.load_state_dict(temp.conv2.state_dict())
+            self.actor.conv3.load_state_dict(temp.conv3.state_dict())
+            self.actor.conv4.load_state_dict(temp.conv4.state_dict())
+            self.critic.conv1.load_state_dict(temp.conv1.state_dict())
+            self.critic.conv2.load_state_dict(temp.conv2.state_dict())
+            self.critic.conv3.load_state_dict(temp.conv3.state_dict())
+            self.critic.conv4.load_state_dict(temp.conv4.state_dict())
+            del temp
+
         self.update_network_params(tau=1) # hard copy
 
     def choose_action(self, state, evaluate=False):

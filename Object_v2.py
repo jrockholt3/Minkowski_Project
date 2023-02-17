@@ -38,8 +38,8 @@ def y_solve(x,z,r,pos):
 def r_solve(z,r,z_c):       
     return np.sqrt(np.abs(r**2 - (z-z_c)**2))
 
-@njit(nb.types.Tuple((float64[:,:],float64[:,:]))(float64[:],float64,float64,float64[:,:],float64))
-def obj_get_coords(curr_pos, t, radius, workspace_limits, res):
+@njit(nb.types.Tuple((float64[:,:],float64[:,:]))(float64[:],float64,float64,float64[:,:],float64,float64))
+def obj_get_coords(curr_pos, t, radius, workspace_limits, res,label):
     x_abs = abs(curr_pos[0]) - radius
     y_abs = abs(curr_pos[1]) - radius
     z_abs = abs(curr_pos[2]) - radius 
@@ -62,7 +62,7 @@ def obj_get_coords(curr_pos, t, radius, workspace_limits, res):
                     point = rnd_arr(np.array([x,y,z]),2,np.zeros(3))
                     if check_range(point, workspace_limits):
                         coord_list[ndx,:] = np.hstack((t_arr, quantize(point,res,workspace_limits)))
-                        feat_list[ndx] = -1.0
+                        feat_list[ndx] = label
                         ndx += 1
                     x = x + res
                 x = curr_pos[0] + r_slice # reset x
@@ -71,7 +71,7 @@ def obj_get_coords(curr_pos, t, radius, workspace_limits, res):
                     point = rnd_arr(np.array([x,y,z]),2,np.zeros(3))
                     if check_range(point,workspace_limits):
                         coord_list[ndx,:] = np.hstack((t_arr, quantize(point,res,workspace_limits)))
-                        feat_list[ndx] = -1.0
+                        feat_list[ndx] = label
                         ndx += 1
                     x = x - res
                 z = z + res
@@ -80,7 +80,7 @@ def obj_get_coords(curr_pos, t, radius, workspace_limits, res):
                 point = rnd_arr(np.array([x,y,z]),2,np.zeros(3))
                 if check_range(point,workspace_limits):
                     coord_list[ndx,:] = np.hstack((t_arr, quantize(point,res,workspace_limits)))
-                    feat_list[ndx] = -1.0
+                    feat_list[ndx] = label
                     ndx += 1
                 z = z + res
                 
@@ -138,7 +138,7 @@ class rand_object():
         return np.array([x,y])
 
     def get_coords(self, t):
-        coords, feats = obj_get_coords(self.curr_pos, t, self.radius, self.workspace_limits, self.res)
+        coords, feats = obj_get_coords(self.curr_pos, t, self.radius, self.workspace_limits, self.res,self.label)
         return coords.astype(np.int16), feats.astype(np.float32)
 
     def step(self, time_step=None):
@@ -151,7 +151,9 @@ class rand_object():
         if time_step*self.dt < self.tf:
             self.curr_pos = self.curr_pos + self.vel*self.dt
         else:
-            self.curr_pos = self.goal
+            self.vel = -1*self.vel
+            self.tf = 2*self.tf
+            self.curr_pos = self.curr_pos + self.vel*self.dt
 
     def render(self):
         u = np.linspace(0,2*np.pi,20)

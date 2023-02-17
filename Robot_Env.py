@@ -15,15 +15,16 @@ Beta = 0 # positive reward for proximity
 Gamma = 0 # negative rewards for be jumps in torque (minimize jerk)
 prox_thres = .05 # proximity threshold - 5 cm
 goal = np.array([np.pi/2, np.pi/2, np.pi/2])
-min_prox = 0.15
+min_prox = 0.1
+vel_prox = 0.4
 
 # Controller gains
-tau_max =  10 #J*rad/s^2, J = 1
+tau_max = 30 #J*rad/s^2, J = 1
 damping = tau_max*.5
 P = 10.0
-D = 5
+D = 50.0
 
-jnt_vel_max = np.pi/1.5 # rad/s
+jnt_vel_max = np.pi/2 # rad/s
 
 rng = np.random.default_rng()
 
@@ -78,10 +79,17 @@ def angle_calc(th):
     c = np.cos(th)
     return np.arctan2(s,c)
 
-def gen_rand_pos():
-    vec = (2*np.random.rand(3) - 1)
-    mag = .4*np.random.rand() + .2
+def gen_rand_pos(quad):
+    vec = (1*np.random.rand(3))
+    if quad==2 or quad==3:
+        vec[0] = -1*vec[0]
+    if quad==3 or quad==4:
+        vec[1] = -1*vec[1]
+    mag = .3*np.random.rand() + .3
     goal = mag * .999 * (vec/np.linalg.norm(vec)) + np.array([0,0,.3])
+    if goal[2] < 0.05:
+        goal[2] = 0.05
+    
     return goal 
 
 class PDControl():
@@ -131,8 +139,12 @@ class RobotEnv():
         self.eval = eval
 
         # setting runtime variables 
-        s = gen_rand_pos()
-        g = gen_rand_pos()
+        quad1 = rng.choice(np.array([1,2,3,4]))
+        quad2 = rng.choice(np.array([1,2,3,4]))
+        if quad1 == quad2:
+            quad2 = (quad1 + 1) % 4
+        s = gen_rand_pos(quad1)
+        g = gen_rand_pos(quad2)
         th_arr = self.robot.reverse(goal=s)
         self.start = th_arr[:,0]
         th_arr = self.robot.reverse(goal=g)
@@ -154,10 +166,21 @@ class RobotEnv():
     def step(self, action, use_PID=False):
         self.t_count += 1
         paused = False
+        prox = -np.inf
         for o in self.objs:
-            prox = self.robot.proximity(o)
-            if np.any(prox <= min_prox):
-                paused = True
+            temp = np.min(self.robot.proximity(o))
+            if temp < prox:
+                prox = temp
+        
+        # stoping the robot is minimum proximity is reached (aka collison)
+        if prox <= min_prox:
+            paused = True 
+
+        # scaling velocity based on proximity 
+        if prox <= (vel_prox):
+            clip_val = jnt_vel_max * (1 - np.exp(-(2/3)*(prox-min_prox)/(vel_prox-min_prox)**2))
+        else:
+            clip_val = jnt_vel_max
 
         if not paused:
             if use_PID:
@@ -171,6 +194,7 @@ class RobotEnv():
                 tau = action
 
             nxt_vel = (tau-damping*self.robot.jnt_vel)*dt + self.robot.jnt_vel
+            nxt_vel = np.clip(nxt_vel, -clip_val, clip_val)
             self.robot.set_jnt_vel(nxt_vel) 
             nxt_pos = angle_calc(dt * self.robot.jnt_vel + self.robot.pos)
             self.robot.set_pose(nxt_pos) # set next pose
@@ -200,18 +224,27 @@ class RobotEnv():
         else:
             done = False
 
+        # check to see if robot went through the floor. Return large negative reward and end episode
+        temp = self.robot.forward()
+        if temp[2,3] <= 0:
+            bonus = -1e6
+            done = True 
+    
         reward = -Alpha * np.linalg.norm(self.jnt_err) + bonus
+        # reward = -Alpha * np.sum(np.abs(self.jnt_err)) + bonus 
 
         coords = []
         feats = []
         if not self.eval: # skip over computation when making an animation
             rob_coords, rob_feats = self.robot.get_coords(self.t_count)
-            coords.append(rob_coords)
-            feats.append(rob_feats)
+
             for obj in self.objs:
                 c,f = obj.get_coords(self.t_count)
                 coords.append(c)
                 feats.append(f)
+            coords.append(rob_coords)
+            feats.append(rob_feats)
+            print(coords[0][0])
             coords = np.vstack(coords)
             feats = np.vstack(feats)
         state = (coords,feats,self.jnt_err)
